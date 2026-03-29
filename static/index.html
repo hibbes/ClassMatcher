@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schiller-Klassen-Mixer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+<header id="header">
+  <div class="header-left">
+    <img src="logo.png" alt="Schiller-Gymnasium Offenburg" class="header-logo" />
+    <div class="header-titles">
+      <span class="logo">Schiller-Klassen-Mixer</span>
+      <span class="subtitle" id="header-subtitle">Klassen-Zuweisung</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button id="btn-fuzzy" class="btn btn-warning hidden" title="Fuzzy-Matches klären">
+      ⚠ Wünsche klären <span id="fuzzy-badge">0</span>
+    </button>
+    <button id="btn-reassign" class="btn btn-primary hidden">Neu zuweisen</button>
+    <button id="btn-clear-locks" class="btn btn-ghost hidden">
+      Manuelle Verschiebungen aufheben
+    </button>
+    <button id="btn-save" class="btn btn-ghost hidden" title="Zuweisungsstand speichern">↓ Speichern</button>
+    <button id="btn-print" class="btn btn-secondary hidden">Drucken</button>
+    <button id="btn-help" class="btn btn-ghost" title="Bedienungsanleitung">?</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ MAIN ═════════════════════════════ -->
+<main id="main">
+
+  <!-- ── Sidebar ── -->
+  <aside id="sidebar" class="hidden">
+    <section class="sidebar-section">
+      <h3>Klassengröße</h3>
+      <label>
+        Max. Schüler/Klasse
+        <div class="input-row">
+          <input type="range" id="p-maxSize" min="15" max="35" step="1" value="30" />
+          <output id="p-maxSize-val">30</output>
+        </div>
+      </label>
+    </section>
+
+    <section class="sidebar-section">
+      <h3>Gewichtung</h3>
+      <label>
+        Freundeswunsch
+        <div class="input-row">
+          <input type="range" id="p-friend" min="0" max="10" step="1" value="5" />
+          <output id="p-friend-val">5</output>
+        </div>
+      </label>
+      <label>
+        Geschlechterbalance
+        <div class="input-row">
+          <input type="range" id="p-gender" min="0" max="10" step="1" value="3" />
+          <output id="p-gender-val">3</output>
+        </div>
+      </label>
+    </section>
+
+    <section class="sidebar-section">
+      <h3>Nicht zusammen</h3>
+      <div id="dont-be-with-list"></div>
+      <button id="btn-add-pair" class="btn btn-ghost btn-sm">+ Paar hinzufügen</button>
+    </section>
+
+    <div class="sidebar-footer">
+      <small>Änderungen → <em>Neu zuweisen</em></small>
+    </div>
+  </aside>
+
+  <!-- ── Content ── -->
+  <div id="content">
+
+    <!-- Upload-Ansicht -->
+    <div id="upload-view">
+      <div id="drop-zone">
+        <div class="drop-icon">📋</div>
+        <p class="drop-title">CSV-Datei hier ablegen</p>
+        <p class="drop-sub">oder klicken zum Auswählen</p>
+        <input type="file" id="file-input" accept=".csv" />
+      </div>
+      <div class="upload-or">oder</div>
+      <button id="btn-load-save" class="btn btn-ghost">↑ Gespeicherten Stand laden</button>
+      <input type="file" id="load-save-input" accept=".json" style="display:none" />
+      <p id="upload-error" class="error-msg hidden"></p>
+    </div>
+
+    <!-- Klassen-Board -->
+    <div id="board-view" class="hidden">
+      <div id="board"></div>
+    </div>
+
+    <!-- Lade-Spinner -->
+    <div id="loading-view" class="hidden">
+      <div class="spinner"></div>
+      <p>Berechne Klassen…</p>
+    </div>
+
+  </div><!-- #content -->
+</main>
+
+<!-- ═══════════════════════ FUZZY MODAL ═════════════════════════ -->
+<div id="fuzzy-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Freundeswünsche klären</h2>
+      <button class="modal-close" id="fuzzy-close">✕</button>
+    </div>
+    <div class="modal-body" id="fuzzy-list"></div>
+    <div class="modal-footer">
+      <button id="fuzzy-done" class="btn btn-primary">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAIR MODAL ══════════════════════════ -->
+<div id="pair-modal" class="modal-overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Nicht zusammen</h2>
+      <button class="modal-close" id="pair-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>Diese zwei Schüler:innen sollen <strong>nicht</strong> in dieselbe Klasse.</p>
+      <div class="pair-inputs">
+        <div class="student-search-wrap">
+          <input type="text" id="pair-a" placeholder="Schüler:in suchen…" autocomplete="off" />
+          <div id="pair-a-results" class="search-dropdown hidden"></div>
+          <input type="hidden" id="pair-a-id" />
+        </div>
+        <span class="pair-sep">≠</span>
+        <div class="student-search-wrap">
+          <input type="text" id="pair-b" placeholder="Schüler:in suchen…" autocomplete="off" />
+          <div id="pair-b-results" class="search-dropdown hidden"></div>
+          <input type="hidden" id="pair-b-id" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="pair-cancel" class="btn btn-ghost">Abbrechen</button>
+      <button id="pair-save"   class="btn btn-primary">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ HILFE MODAL ═════════════════════════ -->
+<div id="help-modal" class="modal-overlay hidden">
+  <div class="modal modal-help">
+    <div class="modal-header">
+      <h2>Bedienungsanleitung – Schiller-Klassen-Mixer</h2>
+      <button class="modal-close" id="help-close">✕</button>
+    </div>
+    <div class="modal-body help-body">
+
+      <section class="help-section">
+        <h3>1. Programm starten</h3>
+        <p>Öffnen Sie ein Terminal, wechseln Sie in den Programmordner und führen Sie aus:</p>
+        <code>./run.sh</code>
+        <p>Der Browser öffnet sich automatisch auf <strong>http://localhost:5001</strong>. Das Programm läuft ausschließlich lokal – keine Daten verlassen Ihren Computer.</p>
+      </section>
+
+      <section class="help-section">
+        <h3>2. CSV-Datei laden</h3>
+        <p>Ziehen Sie die Anmeldungs-CSV-Datei auf das Ablage-Feld oder klicken Sie darauf und wählen Sie die Datei aus. Das Programm liest alle Schülerdaten ein und führt sofort eine erste automatische Klassenzuweisung durch.</p>
+        <div class="help-hint">Die CSV-Datei muss das Format der Schulverwaltungssoftware haben (Felder: ID, Name, Vorname, Geschlecht, Profil1, Klassenpartner, Fremdsprache2 …).</div>
+      </section>
+
+      <section class="help-section">
+        <h3>3. Freundeswünsche klären <span class="help-badge warn">⚠</span></h3>
+        <p>Das Feld <em>Klassenpartner</em> enthält freie Texteingaben der Eltern. Das Programm versucht, die genannten Namen automatisch den vorhandenen Schülerinnen und Schülern zuzuordnen (Fuzzy-Matching).</p>
+        <p>Erscheint der <strong>orangefarbene ⚠-Button</strong> oben, gibt es Fälle, die nicht eindeutig erkannt wurden. Klicken Sie darauf, um jeden unsicheren Treffer manuell zu bestätigen oder zu überspringen. Erst danach ist die Zuweisung vollständig.</p>
+      </section>
+
+      <section class="help-section">
+        <h3>4. Klassenübersicht verstehen</h3>
+        <p>Jede Klasse wird als Spalte dargestellt. Auf jeder Schülerkarte sehen Sie:</p>
+        <ul>
+          <li><span class="help-dot m"></span> / <span class="help-dot w"></span> Geschlecht (blau = Junge, pink = Mädchen)</li>
+          <li><strong>Name</strong> des Schülers / der Schülerin</li>
+          <li><span class="badge badge-5x">Musik</span> <span class="badge badge-5y">Bili</span> <span class="badge badge-5z">Normal</span> gewählter Zug</li>
+          <li><span class="badge badge-F">Franzö.</span> <span class="badge badge-L">Latein</span> zweite Fremdsprache</li>
+          <li><span class="wish-tag wish-ok">✓ Name</span> Freundeswunsch erfüllt (grün)</li>
+          <li><span class="wish-tag wish-miss">✗ Name → 5z-1</span> Wunsch nicht erfüllt, mit Zielklasse (orange)</li>
+          <li><span style="font-size:12px">🔒</span> Schüler wurde manuell verschoben und ist gesperrt</li>
+        </ul>
+        <p>Der <strong>Klassenname</strong> (z.B. „Musikzug") kann durch Anklicken direkt umbenannt werden.</p>
+      </section>
+
+      <section class="help-section">
+        <h3>5. Parameter einstellen</h3>
+        <p>Die linke Seitenleiste enthält Regler, mit denen Sie die Zuweisung steuern. Jede Änderung löst nach kurzer Pause automatisch eine Neuberechnung aus.</p>
+        <table class="help-table">
+          <tr><td><strong>Max. Schüler/Klasse</strong></td><td>Maximale Klassengröße. Daraus ergibt sich auch die Anzahl der Klassen automatisch.</td></tr>
+          <tr><td><strong>Freundeswunsch</strong></td><td>Wie stark soll versucht werden, Freundschaftswünsche zu erfüllen? (0 = ignorieren, 10 = maximale Priorität)</td></tr>
+          <tr><td><strong>Geschlechterbalance</strong></td><td>Wie ausgeglichen soll das Verhältnis von Jungen und Mädchen pro Klasse sein?</td></tr>
+        </table>
+        <p class="help-hint">Feste Regel: Der Algorithmus stellt automatisch sicher, dass die letzte Normalzug-Klasse keine Latein-Schüler enthält. Diese Regel ist immer aktiv und kann nicht deaktiviert werden. Manuell verschobene Schüler können sie überschreiben.</p>
+      </section>
+
+      <section class="help-section">
+        <h3>6. „Nicht zusammen"-Paare</h3>
+        <p>Klicken Sie in der Seitenleiste auf <strong>+ Paar hinzufügen</strong>, suchen Sie zwei Schülerinnen oder Schüler und speichern Sie. Das Programm sorgt dafür, dass diese beiden <em>niemals</em> in dieselbe Klasse kommen – bei jeder Neuberechnung.</p>
+        <p>Eingetragene Paare können mit dem ✕-Symbol wieder entfernt werden.</p>
+      </section>
+
+      <section class="help-section">
+        <h3>7. Manuell verschieben</h3>
+        <p>Schülerinnen und Schüler können per <strong>Drag &amp; Drop</strong> von einer Klasse in eine andere gezogen werden. Das Programm merkt sich diese Entscheidung (🔒) und behält sie auch bei automatischen Neuberechnungen bei.</p>
+        <p>Das Schloss-Symbol 🔒 auf einer Karte anklicken hebt die Sperre für diesen Schüler auf. Mit dem Button <strong>„Manuelle Verschiebungen aufheben"</strong> werden alle Sperren auf einmal gelöscht – bei der nächsten Neuberechnung verteilt der Algorithmus wieder frei.</p>
+      </section>
+
+      <section class="help-section">
+        <h3>8. Drucken</h3>
+        <p>Der Button <strong>Drucken</strong> öffnet den Druckdialog des Browsers. Für jede Klasse wird eine eigene Seite erzeugt mit:</p>
+        <ul>
+          <li>Schullogo, Klassenname und Datum</li>
+          <li>Statistik-Zeile (Anzahl, Jungen/Mädchen, erfüllte Wünsche)</li>
+          <li>Tabelle mit: Lfd. Nr. · Name, Vorname · Zug · 2. Fremdsprache · Wunschfreunde in der Klasse</li>
+        </ul>
+        <div class="help-hint">Tipp: Im Browser-Druckdialog „Hintergrundgrafiken drucken" aktivieren, damit die farbige Tabellenüberschrift erscheint.</div>
+      </section>
+
+      <section class="help-section">
+        <h3>9. Häufige Fragen</h3>
+        <table class="help-table">
+          <tr>
+            <td><strong>Warum sind Musikzug und Bili-Klasse größer als der Normalzug?</strong></td>
+            <td>Musik- und Bili-Klassen werden automatisch mit Normalzug-Schülern aufgefüllt, damit alle Klassen ähnlich groß sind. Welche Normalzug-Schüler wohin kommen, optimiert der Algorithmus.</td>
+          </tr>
+          <tr>
+            <td><strong>Warum ändert sich das Ergebnis bei jedem Klick auf „Neu zuweisen"?</strong></td>
+            <td>Der Algorithmus (Simulated Annealing) startet mit einer zufälligen Ausgangsbelegung. Das Ergebnis kann leicht variieren, erfüllt aber stets die eingestellten Kriterien optimal.</td>
+          </tr>
+          <tr>
+            <td><strong>Was passiert, wenn ein Freundeswunsch nicht erfüllbar ist?</strong></td>
+            <td>Das Programm zeigt auf der Karte den Namen und die Klasse, in der der gewünschte Freund gelandet ist (orangefarbener Tag). Es handelt sich um einen Hinweis, keine Fehlermeldung.</td>
+          </tr>
+          <tr>
+            <td><strong>Kann ich die Klassen umbenennen?</strong></td>
+            <td>Ja – einfach den Klassennamen in der Spaltenüberschrift anklicken, neuen Namen eintippen und mit Enter bestätigen.</td>
+          </tr>
+          <tr>
+            <td><strong>Werden meine Daten gespeichert?</strong></td>
+            <td>Nur wenn Sie es aktiv tun. Mit dem Button <strong>↓ Speichern</strong> (oben rechts, nach der Zuweisung) laden Sie den aktuellen Stand als JSON-Datei herunter – inklusive aller manuellen Verschiebungen, Wunschauflösungen und Klassenumbenennungen. Diese Datei können Sie später über <strong>↑ Gespeicherten Stand laden</strong> im Upload-Bereich wiederherstellen. Ohne Speichern gehen alle Daten beim Beenden verloren.</td>
+          </tr>
+        </table>
+      </section>
+
+    </div>
+    <div class="modal-footer">
+      <button id="help-done" class="btn btn-primary">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PRINT VIEW ══════════════════════════ -->
+<div id="print-view" class="hidden">
+  <div id="print-content"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
