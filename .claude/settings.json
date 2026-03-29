@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/marek/ClassMatcher && if [ -n \"$(git status --porcelain)\" ]; then git add -A && MSG=$(git diff --cached --stat | tail -1) && git commit -m \"auto: ${MSG:-Änderungen}\" && git push origin main; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

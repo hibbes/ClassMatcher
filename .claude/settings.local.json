@@ -42,7 +42,14 @@
       "Bash(ls ~/Library/Python/*/bin/pyinstaller)",
       "Bash(.venv/bin/pyinstaller --version)",
       "Bash(.venv/bin/pyinstaller --noconfirm --onedir --windowed --name \"Schiller-Klassen-Mixer\" --icon /tmp/AppIcon.icns --add-data \"static:static\" --add-data \"app.py:.\" --add-data \"matcher.py:.\" launcher.py)",
-      "Bash(hdiutil create:*)"
+      "Bash(hdiutil create:*)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(ls /Users/marek/ClassMatcher/*.csv)",
+      "Read(//Users/marek/Downloads/**)",
+      "Bash(curl -s -F \"file=@/Users/marek/ClassMatcher/Anmeldungen.csv\" http://localhost:5001/api/upload)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }

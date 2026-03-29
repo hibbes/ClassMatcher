@@ -678,11 +678,15 @@ function buildPrintView() {
                       : s.fremdsprache2 === "L" ? "Latein"
                       : s.fremdsprache2 || "–";
 
-      // Wunschfreunde: erfüllt (in dieser Klasse)
+      // Wunschfreunde: erfüllt und nicht erfüllt
       const wishes = (s.wishInfo || []);
-      const fulfilled = wishes.filter(w => w.fulfilled).map(w => w.friendName);
-      const wishCell = fulfilled.length > 0
-        ? `<td class="pt-wish">${fulfilled.join(", ")}</td>`
+      const wishParts = wishes.map(w =>
+        w.fulfilled
+          ? `<span class="pt-wish-yes">✓ ${w.friendName}</span>`
+          : `<span class="pt-wish-no">✗ ${w.friendName}${w.friendClass ? ` (${w.friendClass})` : ""}</span>`
+      );
+      const wishCell = wishParts.length > 0
+        ? `<td class="pt-wish">${wishParts.join(" ")}</td>`
         : `<td class="pt-wish-none">–</td>`;
 
       return `
@@ -728,7 +732,7 @@ function buildPrintView() {
             <th>Name, Vorname</th>
             <th>Zug</th>
             <th>2. Fremdsprache</th>
-            <th>Wunschfreunde (in dieser Klasse)</th>
+            <th>Freundeswünsche</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>

@@ -912,8 +912,10 @@ html, body {
   .pt-name  { font-weight: 500; }
   .pt-zug   { white-space: nowrap; }
   .pt-lang  { white-space: nowrap; }
-  .pt-wish  { font-size: 8.5pt; color: #16a34a; }
+  .pt-wish      { font-size: 8.5pt; }
   .pt-wish-none { font-size: 8.5pt; color: #94a3b8; }
+  .pt-wish-yes  { color: #16a34a; margin-right: 4px; }
+  .pt-wish-no   { color: #b45309; margin-right: 4px; }
 
   /* Geschlechts-Punkt */
   .print-dot {
