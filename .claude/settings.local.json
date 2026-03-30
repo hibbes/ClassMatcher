@@ -60,7 +60,8 @@
       "Bash(mv /tmp/Collatz/Collatz/src/Collatz_utf8.java /tmp/Collatz/Collatz/src/Collatz.java)",
       "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java -d /tmp/Collatz_bin)",
       "Bash(mkdir -p /tmp/Collatz_bin)",
-      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)"
+      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)",
+      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)"
     ]
   }
 }
