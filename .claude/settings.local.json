@@ -50,7 +50,8 @@
       "Bash(curl -s -F \"file=@/Users/marek/ClassMatcher/Anmeldungen.csv\" http://localhost:5001/api/upload)",
       "Skill(update-config)",
       "Skill(update-config:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(brew install:*)"
     ]
   }
 }
