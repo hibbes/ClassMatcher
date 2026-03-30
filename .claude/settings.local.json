@@ -55,7 +55,12 @@
       "Bash(gh repo:*)",
       "Bash(/opt/homebrew/bin/gh auth:*)",
       "Bash(gh api:*)",
-      "Bash(ls -1 /tmp/raspi-analysis/RaspiAnm/.env*)"
+      "Bash(ls -1 /tmp/raspi-analysis/RaspiAnm/.env*)",
+      "Bash(iconv -f ISO-8859-1 -t UTF-8 /tmp/Collatz/Collatz/src/Collatz.java)",
+      "Bash(mv /tmp/Collatz/Collatz/src/Collatz_utf8.java /tmp/Collatz/Collatz/src/Collatz.java)",
+      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java -d /tmp/Collatz_bin)",
+      "Bash(mkdir -p /tmp/Collatz_bin)",
+      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)"
     ]
   }
 }
