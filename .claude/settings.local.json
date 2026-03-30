@@ -53,7 +53,8 @@
       "Bash(gh auth:*)",
       "Bash(brew install:*)",
       "Bash(gh repo:*)",
-      "Bash(/opt/homebrew/bin/gh auth:*)"
+      "Bash(/opt/homebrew/bin/gh auth:*)",
+      "Bash(gh api:*)"
     ]
   }
 }
