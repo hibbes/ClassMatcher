@@ -51,7 +51,9 @@
       "Skill(update-config)",
       "Skill(update-config:*)",
       "Bash(gh auth:*)",
-      "Bash(brew install:*)"
+      "Bash(brew install:*)",
+      "Bash(gh repo:*)",
+      "Bash(/opt/homebrew/bin/gh auth:*)"
     ]
   }
 }
