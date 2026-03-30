@@ -61,7 +61,11 @@
       "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java -d /tmp/Collatz_bin)",
       "Bash(mkdir -p /tmp/Collatz_bin)",
       "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/Collatz.java /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)",
-      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)"
+      "Bash(javac -encoding UTF-8 /tmp/Collatz/Collatz/src/CollatzViz.java -d /tmp/Collatz_bin)",
+      "Bash(2)",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(d[''''status'''']\\)\")",
+      "mcp__Control_Chrome__open_url",
+      "mcp__Control_Chrome__get_page_content"
     ]
   }
 }
