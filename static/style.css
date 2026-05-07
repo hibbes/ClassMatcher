@@ -916,6 +916,7 @@ html, body {
   .pt-wish-none { font-size: 8.5pt; color: #94a3b8; }
   .pt-wish-yes  { color: #16a34a; margin-right: 4px; }
   .pt-wish-no   { color: #b45309; margin-right: 4px; }
+  .pt-wish-reason { color: #78350f; font-style: italic; font-size: 7.5pt; }
 
   /* Geschlechts-Punkt */
   .print-dot {

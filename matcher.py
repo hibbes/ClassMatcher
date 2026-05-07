@@ -568,6 +568,42 @@ def calculate_classes(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Wunsch-Trennungsgrund (für nicht erfüllte Freundeswünsche)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def wish_reason(
+    student:          dict,
+    friend:           dict,
+    student_class:    str,
+    friend_class:     str,
+    latin_free_class: str | None,
+    resolved_wishes:  dict,
+) -> str | None:
+    """Strukturellen Grund für getrennte Klassen bestimmen, oder None
+    wenn es 'nur' Optimierungs-Tradeoff war."""
+    s_pro, f_pro = student.get("profil"), friend.get("profil")
+
+    # Bili-Trennung: einer ist Bili-Profil, der andere nicht
+    if BILI_TRACK in (s_pro, f_pro) and s_pro != f_pro:
+        return "Bili-Klasse"
+
+    # Latein-Trennung: einer Latein in lateinfreier Klasse, anderer nicht
+    if latin_free_class:
+        s_lat = student.get("fremdsprache2") == "L"
+        f_lat = friend.get("fremdsprache2") == "L"
+        if s_lat != f_lat:
+            if (s_lat and friend_class == latin_free_class) or \
+               (f_lat and student_class  == latin_free_class):
+                return "Latein"
+
+    # Einseitig: Freund hat den Schüler nicht (auch) als Wunsch eingetragen
+    if student["id"] not in resolved_wishes.get(friend["id"], []):
+        return "einseitiger Wunsch"
+
+    return None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Statistiken
 # ──────────────────────────────────────────────────────────────────────────────
 

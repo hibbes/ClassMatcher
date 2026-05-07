@@ -173,6 +173,49 @@ def dont_be_with():
 # Klassen-Zuweisung
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _latin_free_class_id(classes: list) -> str | None:
+    """Letzte Nicht-Bili-Klasse = lateinfreie Klasse (analog matcher.calculate_classes)."""
+    fill_ids = [c["id"] for c in classes if c["id"] != "5y"]
+    return fill_ids[-1] if len(fill_ids) >= 2 else None
+
+
+def _attach_wish_info(response_classes: list, sm: dict) -> None:
+    """Erfüllt-Status + Trennungsgrund zu jedem Schüler in response_classes hängen."""
+    from matcher import wish_reason
+
+    sid_to_cls_id   = {}
+    sid_to_cls_name = {}
+    for cls in response_classes:
+        for s in cls["students"]:
+            sid_to_cls_id[s["id"]]   = cls["id"]
+            sid_to_cls_name[s["id"]] = cls["name"]
+
+    latin_free = _latin_free_class_id(response_classes)
+    resolved   = _state["resolved_wishes"]
+
+    for cls in response_classes:
+        for s in cls["students"]:
+            wish_info = []
+            for fid in resolved.get(s["id"], []):
+                if fid not in sm:
+                    continue
+                f_cls_id  = sid_to_cls_id.get(fid)
+                fulfilled = (f_cls_id == cls["id"])
+                entry = {
+                    "friendId":    fid,
+                    "friendName":  sm[fid]["displayName"],
+                    "fulfilled":   fulfilled,
+                    "friendClass": None if fulfilled else sid_to_cls_name.get(fid),
+                }
+                if not fulfilled:
+                    entry["reason"] = wish_reason(
+                        s, sm[fid], cls["id"], f_cls_id,
+                        latin_free, resolved,
+                    )
+                wish_info.append(entry)
+            s["wishInfo"] = wish_info
+
+
 @app.route("/api/assign", methods=["POST"])
 def assign():
     from matcher import calculate_classes, calculate_stats
@@ -212,30 +255,7 @@ def assign():
             for cls in classes
         ]
 
-        # Rückwärts-Maps für Wish-Info
-        sid_to_cls_id   = {}
-        sid_to_cls_name = {}
-        for cls in response_classes:
-            for s in cls["students"]:
-                sid_to_cls_id[s["id"]]   = cls["id"]
-                sid_to_cls_name[s["id"]] = cls["name"]
-
-        # Freundeswunsch-Status zu jedem Schüler hinzufügen
-        for cls in response_classes:
-            for s in cls["students"]:
-                wish_info = []
-                for fid in _state["resolved_wishes"].get(s["id"], []):
-                    if fid not in sm:
-                        continue
-                    f_cls_id   = sid_to_cls_id.get(fid)
-                    fulfilled  = (f_cls_id == cls["id"])
-                    wish_info.append({
-                        "friendId":    fid,
-                        "friendName":  sm[fid]["displayName"],
-                        "fulfilled":   fulfilled,
-                        "friendClass": None if fulfilled else sid_to_cls_name.get(fid),
-                    })
-                s["wishInfo"] = wish_info
+        _attach_wish_info(response_classes, sm)
 
         stats = calculate_stats(
             [{"id": c["id"], "students": [s["id"] for s in c["students"]]}
@@ -346,30 +366,7 @@ def load_state():
         elif cls["id"] in _DEFAULT_NAMES and cls["id"] not in _state["class_names"]:
             cls["name"] = _DEFAULT_NAMES[cls["id"]]
 
-    # Rückwärts-Maps für Wish-Info
-    sid_to_cls_id   = {}
-    sid_to_cls_name = {}
-    for cls in saved_classes:
-        for s in cls["students"]:
-            sid_to_cls_id[s["id"]]   = cls["id"]
-            sid_to_cls_name[s["id"]] = cls["name"]
-
-    # Freundeswunsch-Status neu berechnen
-    for cls in saved_classes:
-        for s in cls["students"]:
-            wish_info = []
-            for fid in _state["resolved_wishes"].get(s["id"], []):
-                if fid not in sm:
-                    continue
-                f_cls_id  = sid_to_cls_id.get(fid)
-                fulfilled = (f_cls_id == cls["id"])
-                wish_info.append({
-                    "friendId":    fid,
-                    "friendName":  sm[fid]["displayName"],
-                    "fulfilled":   fulfilled,
-                    "friendClass": None if fulfilled else sid_to_cls_name.get(fid),
-                })
-            s["wishInfo"] = wish_info
+    _attach_wish_info(saved_classes, sm)
 
     stats = calculate_stats(
         [{"id": c["id"], "students": [s["id"] for s in c["students"]]}

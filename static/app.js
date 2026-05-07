@@ -680,13 +680,18 @@ function buildPrintView() {
                       : s.fremdsprache2 === "L" ? "Latein"
                       : s.fremdsprache2 || "–";
 
-      // Wunschfreunde: erfüllt und nicht erfüllt
+      // Wunschfreunde: erfüllt und nicht erfüllt (mit Trennungsgrund)
       const wishes = (s.wishInfo || []);
-      const wishParts = wishes.map(w =>
-        w.fulfilled
-          ? `<span class="pt-wish-yes">✓ ${w.friendName}</span>`
-          : `<span class="pt-wish-no">✗ ${w.friendName}${w.friendClass ? ` (${w.friendClass})` : ""}</span>`
-      );
+      const wishParts = wishes.map(w => {
+        if (w.fulfilled) {
+          return `<span class="pt-wish-yes">✓ ${w.friendName}</span>`;
+        }
+        const cls = w.friendClass ? ` (${w.friendClass})` : "";
+        // Grund nur anzeigen, wenn nicht schon im Klassenname enthalten
+        const showReason = w.reason && w.reason !== w.friendClass;
+        const reason = showReason ? ` <em class="pt-wish-reason">– ${w.reason}</em>` : "";
+        return `<span class="pt-wish-no">✗ ${w.friendName}${cls}${reason}</span>`;
+      });
       const wishCell = wishParts.length > 0
         ? `<td class="pt-wish">${wishParts.join(" ")}</td>`
         : `<td class="pt-wish-none">–</td>`;
