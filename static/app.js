@@ -19,6 +19,7 @@ const state = {
     maxClassSize:           30,
     weightFriendWish:        5,
     weightGenderBalance:     3,
+    weightMusicSplit:       50,
   },
   view:           "upload",  // "upload" | "loading" | "board"
   dragStudentId:  null,
@@ -623,16 +624,16 @@ function setupParams() {
     await doAssign();
   }, 600);
 
-  function bindSlider(id, key, outputId) {
+  function bindSlider(id, key, outputId, suffix = "") {
     const slider = document.getElementById(id);
     const output = document.getElementById(outputId);
     slider.value = state.params[key];
-    output.textContent = state.params[key];
+    output.textContent = state.params[key] + suffix;
 
     slider.addEventListener("input", () => {
       const val = Number(slider.value);
       state.params[key] = val;
-      output.textContent = val;
+      output.textContent = val + suffix;
       debouncedUpdate();
     });
   }
@@ -640,6 +641,7 @@ function setupParams() {
   bindSlider("p-maxSize", "maxClassSize",        "p-maxSize-val");
   bindSlider("p-friend",  "weightFriendWish",    "p-friend-val");
   bindSlider("p-gender",  "weightGenderBalance", "p-gender-val");
+  bindSlider("p-music",   "weightMusicSplit",    "p-music-val", "%");
 }
 
 // ──────────────────────────────────────────────────────────────────

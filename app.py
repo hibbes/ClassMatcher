@@ -24,6 +24,7 @@ _state: dict = {
         "maxClassSize":           30,
         "weightFriendWish":        5,
         "weightGenderBalance":     3,
+        "weightMusicSplit":       50,   # 0..100 – Musikzug auf 2 Klassen verteilt
     },
 }
 
@@ -192,7 +193,7 @@ def assign():
         )
 
         # Standard-Klassennamen, sofern nicht manuell umbenannt
-        _DEFAULT_NAMES = {"5x": "Musikzug", "5y": "Bili-Klasse"}
+        _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
         for cls in classes:
             if cls["id"] in _state["class_names"]:
                 cls["name"] = _state["class_names"][cls["id"]]
@@ -338,7 +339,7 @@ def load_state():
     sm = _student_map()
 
     # Klassenname aus class_names anwenden (analog zu assign())
-    _DEFAULT_NAMES = {"5x": "Musikzug", "5y": "Bili-Klasse"}
+    _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
     for cls in saved_classes:
         if cls["id"] in _state["class_names"]:
             cls["name"] = _state["class_names"][cls["id"]]

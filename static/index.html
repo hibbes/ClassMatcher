@@ -63,6 +63,20 @@
           <output id="p-gender-val">3</output>
         </div>
       </label>
+      <label title="Wie streng soll der Musikzug auf zwei Klassen (außer Bili) gleichmäßig verteilt werden?">
+        Musikzug-Verteilung
+        <div class="input-row">
+          <input type="range" id="p-music" min="0" max="100" step="25" value="50" list="music-ticks" />
+          <output id="p-music-val">50%</output>
+        </div>
+        <datalist id="music-ticks">
+          <option value="0"></option>
+          <option value="25"></option>
+          <option value="50"></option>
+          <option value="75"></option>
+          <option value="100"></option>
+        </datalist>
+      </label>
     </section>
 
     <section class="sidebar-section">
@@ -201,8 +215,9 @@
           <tr><td><strong>Max. Schüler/Klasse</strong></td><td>Maximale Klassengröße. Daraus ergibt sich auch die Anzahl der Klassen automatisch.</td></tr>
           <tr><td><strong>Freundeswunsch</strong></td><td>Wie stark soll versucht werden, Freundschaftswünsche zu erfüllen? (0 = ignorieren, 10 = maximale Priorität)</td></tr>
           <tr><td><strong>Geschlechterbalance</strong></td><td>Wie ausgeglichen soll das Verhältnis von Jungen und Mädchen pro Klasse sein?</td></tr>
+          <tr><td><strong>Musikzug-Verteilung</strong></td><td>Wie streng sollen die Musikzug-Schüler:innen auf <em>genau zwei</em> Klassen (nie die Bili-Klasse) gleichmäßig verteilt werden? 0 % = egal, 100 % = strikte 50/50-Aufteilung.</td></tr>
         </table>
-        <p class="help-hint">Feste Regel: Der Algorithmus stellt automatisch sicher, dass die letzte Normalzug-Klasse keine Latein-Schüler enthält. Diese Regel ist immer aktiv und kann nicht deaktiviert werden. Manuell verschobene Schüler können sie überschreiben.</p>
+        <p class="help-hint">Feste Regeln, immer aktiv: Die Bili-Klasse bekommt nie Musikzug-Schüler:innen. Die letzte Normalzug-Klasse bleibt latein­frei. Manuell verschobene Schüler:innen können diese Regeln überschreiben.</p>
       </section>
 
       <section class="help-section">
