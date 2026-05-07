@@ -59,7 +59,7 @@ jobs:
           path: Schiller-Klassen-Mixer.dmg
           retention-days: 30
 
-  # ── Windows: ZIP ────────────────────────────────────────────────
+  # ── Windows: Single-File EXE ────────────────────────────────────
   build-windows:
     runs-on: windows-latest
     steps:
@@ -81,11 +81,11 @@ jobs:
                    sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
           "
 
-      - name: PyInstaller-Build
+      - name: PyInstaller-Build (Onefile, alles in einer EXE)
         run: |
           pyinstaller `
             --noconfirm `
-            --onedir `
+            --onefile `
             --windowed `
             --name "Schiller-Klassen-Mixer" `
             --icon "static\logo.ico" `
@@ -94,15 +94,9 @@ jobs:
             --add-data "matcher.py;." `
             launcher.py
 
-      - name: ZIP erstellen
-        run: |
-          Compress-Archive `
-            -Path "dist\Schiller-Klassen-Mixer" `
-            -DestinationPath "Schiller-Klassen-Mixer-Windows.zip"
-
-      - name: ZIP hochladen
+      - name: EXE hochladen
         uses: actions/upload-artifact@v4
         with:
           name: Schiller-Klassen-Mixer-Windows
-          path: Schiller-Klassen-Mixer-Windows.zip
+          path: dist/Schiller-Klassen-Mixer.exe
           retention-days: 30
