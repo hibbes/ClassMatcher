@@ -19,8 +19,8 @@ const state = {
   params: {
     maxClassSize:           30,
     minClassSize:           22,
-    weightFriendWish:        5,
-    weightGenderBalance:     3,
+    weightFriendWish:        7,
+    weightGenderBalance:     2,
     weightMusicSplit:       50,
     weightProfileCluster:   50,
   },

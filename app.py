@@ -24,8 +24,8 @@ _state: dict = {
     "params": {
         "maxClassSize":           30,
         "minClassSize":           22,    # nur Modus klasse8 relevant
-        "weightFriendWish":        5,
-        "weightGenderBalance":     3,
+        "weightFriendWish":        7,    # höher als Gender (User-Wunsch 2026-05-11)
+        "weightGenderBalance":     2,
         "weightMusicSplit":       50,    # 0..100 – Modus klasse5: Musikzug auf 2 Klassen
         "weightProfileCluster":   50,    # 0..100 – Modus klasse8: Profile zusammenhalten
     },

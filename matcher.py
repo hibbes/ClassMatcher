@@ -856,6 +856,7 @@ def optimize_klasse8_assignment(
     bili_ids:         set,
     latein_ids:       set,
     musik_ids:        set,
+    latein_mode:      str = "strict",
 ) -> dict:
     """SA-Verteilung für Klasse 8.
 
@@ -876,8 +877,7 @@ def optimize_klasse8_assignment(
         is_bili   = sid in bili_ids
         is_musik  = sid in musik_ids
         is_latein = sid in latein_ids
-        # Bili dominiert über Musik, falls beides gewählt (in Praxis
-        # nicht vorgesehen, aber defensiv): Bili-Klasse statt Musik-Klasse.
+        # Bili dominiert über Musik bei Doppel-Wahl (in Praxis 0 Fälle).
         if is_bili and bili_classes:
             for c in class_ids:
                 if c not in bili_classes:
@@ -886,13 +886,16 @@ def optimize_klasse8_assignment(
             for c in class_ids:
                 if c != musik_class:
                     f.add(c)
-        # Latein-Klassen-Constraint gilt nicht für Musik-Profilianten:
-        # sie müssen in die Musik-Klasse (sonst Musik+Bili-Konflikt in den
-        # Bili/Latein-Klassen) und können dort nicht ausgeschlossen werden.
-        if is_latein and not is_musik and latein_classes:
-            for c in class_ids:
-                if c not in latein_classes:
-                    f.add(c)
+        # Latein-Constraint:
+        #   strict          – hart für alle Latein-SuS (inkl. Musik-Latein)
+        #   musik_exception – Musik-Latein-SuS bleiben in Musik-Klasse,
+        #                     auch wenn diese formal nicht Latein-Klasse ist.
+        if is_latein and latein_classes:
+            relax = (latein_mode == "musik_exception" and is_musik)
+            if not relax:
+                for c in class_ids:
+                    if c not in latein_classes:
+                        f.add(c)
         return f
 
     # ── Startbelegung ────────────────────────────────────────────
@@ -930,28 +933,19 @@ def optimize_klasse8_assignment(
     rest.sort(key=lambda s: s.get("profil") or "")
 
     def place(slist, allowed):
+        """Verteile slist so, dass aktuell kleinste erlaubte Klasse zuerst
+        wächst – Ziel: gleichmäßige Klassengrößen."""
         if not slist or not allowed:
             return
-        order = sorted(allowed, key=lambda c: -rem_cap.get(c, 0))
-        idx = 0
-        while idx < len(slist):
-            placed = False
-            for cid in order:
-                if rem_cap.get(cid, 0) > 0 and idx < len(slist):
-                    asgn[cid].append(slist[idx]["id"])
-                    rem_cap[cid] -= 1
-                    idx += 1
-                    placed = True
-            if not placed:
-                # Letzter Ausweg: irgendeine erlaubte Klasse mit Platz
-                for cid in allowed:
-                    if rem_cap.get(cid, 0) > 0 and idx < len(slist):
-                        asgn[cid].append(slist[idx]["id"])
-                        rem_cap[cid] -= 1
-                        idx += 1
-                        break
-                else:
-                    break
+        priority = {c: i for i, c in enumerate(allowed)}   # stabile Tiebreaker
+        for stud in slist:
+            elig = [c for c in allowed if rem_cap.get(c, 0) > 0]
+            if not elig:
+                break
+            elig.sort(key=lambda c: (len(asgn[c]), priority[c]))
+            cid = elig[0]
+            asgn[cid].append(stud["id"])
+            rem_cap[cid] -= 1
 
     place(music_grp,   [musik_class] if musik_class else class_ids)
     place(bili_lat,    bili_classes  if bili_classes  else (latein_classes or class_ids))
@@ -1036,30 +1030,76 @@ def calculate_classes_klasse8(
     w_friend   = params.get("weightFriendWish",     5)
     w_gender   = params.get("weightGenderBalance",  3)
     w_profile  = params.get("weightProfileCluster", 50)
+    # "strict"           – Latein hart auf max 2 Klassen (Pflicht); falls
+    #                      Musik-Latein-SuS existieren, wird die zweite
+    #                      Bili-Klasse gestrichen, damit die Musik-Klasse
+    #                      als 2. Latein-Klasse dienen kann.
+    # "musik_exception"  – Latein auf max 2 Klassen, ABER Musik-Latein-SuS
+    #                      bleiben in der Musik-Klasse (faktisch 3.
+    #                      Latein-Klasse mit nur den Musik-Latein-SuS).
+    latein_mode      = params.get("lateinMode", "strict")
+    force_num_cls    = params.get("forceNumClasses")
 
     n = len(students)
     if n == 0:
         return []
 
-    # Anzahl Klassen so wählen, dass avg <= max und avg >= min (falls möglich).
-    # Bevorzugt: kleinstes k, für das n/k <= max_size.
-    num_classes = max(1, math.ceil(n / max_size))
-    while min_size and num_classes > 1 and n / num_classes < min_size:
-        num_classes -= 1
-        if math.ceil(n / num_classes) > max_size:
-            num_classes += 1   # rollback – sonst max verletzt
-            break
-
-    class_ids = [f"8{chr(ord('a') + i)}" for i in range(num_classes)]
-
     student_map = {s["id"]: s for s in students}
-
     bili_ids   = {s["id"] for s in students if s.get("bili")}
     latein_ids = {s["id"] for s in students if s.get("latein")}
     musik_ids  = {s["id"] for s in students if s.get("profil") == PROFIL_MUSIK}
 
-    # Bili in max 2 Klassen
-    n_bili_classes = min(2, num_classes) if bili_ids else 0
+    musik_latein_count = sum(
+        1 for s in students
+        if s.get("profil") == PROFIL_MUSIK and s.get("latein")
+    )
+
+    if latein_mode == "musik_exception":
+        # Klassisches Modus-5-Schema: 2 Bili-Klassen erlaubt; Musik-Latein
+        # bleibt in der Musik-Klasse (siehe forbidden_for unten).
+        max_bili_classes = 2
+    else:
+        # Strict: bei Musik-Latein-SuS höchstens 1 Bili-Klasse, damit
+        # Musik-Klasse als zweite Latein-Klasse fungieren kann.
+        max_bili_classes = 1 if musik_latein_count > 0 else 2
+        if len(bili_ids) > max_size and max_bili_classes < 2:
+            max_bili_classes = 2
+
+    # Anzahl Klassen so wählen, dass:
+    #  – durchschnittliche Größe ≤ max_size
+    #  – durchschnittliche Größe ≥ min_size (so weit wie möglich)
+    #  – Rest-Schüler (kein Bili/Musik) passen in die Nicht-Bili/Musik-
+    #    Klassen, ohne max_size zu sprengen
+    bili_count   = len(bili_ids)
+    musik_count  = len(musik_ids)
+    rest_count   = n - bili_count - musik_count   # untere Schranke für rest
+
+    def fits(nc):
+        if nc * max_size < n:
+            return False
+        if min_size and nc > 1 and n / nc < min_size and nc - 1 >= 1 \
+           and math.ceil(n / (nc - 1)) <= max_size:
+            return False
+        n_bili_cls  = min(max_bili_classes, nc) if bili_count else 0
+        n_musik_cls = 1 if musik_count else 0
+        normal_cls  = nc - n_bili_cls - n_musik_cls
+        if normal_cls < 0:
+            return False
+        if normal_cls > 0 and rest_count / normal_cls > max_size:
+            return False
+        return True
+
+    if force_num_cls:
+        num_classes = max(1, int(force_num_cls))
+    else:
+        num_classes = max(1, math.ceil(n / max_size))
+        while not fits(num_classes) and num_classes < n:
+            num_classes += 1
+
+    class_ids = [f"8{chr(ord('a') + i)}" for i in range(num_classes)]
+
+    # Bili-Klassen (max 1 oder 2 je nach Musik-Latein-Lage)
+    n_bili_classes = min(max_bili_classes, num_classes) if bili_ids else 0
     bili_classes   = class_ids[:n_bili_classes]
 
     # Musik-Klasse: erste Nicht-Bili-Klasse
@@ -1068,20 +1108,23 @@ def calculate_classes_klasse8(
         non_bili = [c for c in class_ids if c not in bili_classes]
         musik_class = non_bili[0] if non_bili else None
 
-    # Latein-Klassen: zuerst die Bili-Klassen (12 Bili+Latein-SuS müssen
-    # dorthin), dann auffüllen auf max 2.
+    # Latein-Klassen: zuerst Bili-Klassen, ggf. Musik-Klasse als 2.
+    # Insgesamt höchstens 2.
     latein_classes = list(bili_classes)
     if latein_ids:
+        if musik_latein_count > 0 and musik_class \
+           and musik_class not in latein_classes \
+           and len(latein_classes) < 2:
+            latein_classes.append(musik_class)
+        # Wenn immer noch < 2 (z.B. gar keine Bili-Klasse), fülle auf
         for c in class_ids:
             if len(latein_classes) >= 2:
                 break
-            if c in latein_classes:
+            if c in latein_classes or c == musik_class:
                 continue
-            if c == musik_class:
-                continue   # Musik-Klasse möglichst latein-frei lassen
             latein_classes.append(c)
         if not latein_classes:
-            latein_classes = [class_ids[-1]]   # fallback
+            latein_classes = [class_ids[-1]]
 
     capacities = {cid: max_size for cid in class_ids}
 
@@ -1097,6 +1140,7 @@ def calculate_classes_klasse8(
         student_map,
         bili_classes, latein_classes, musik_class,
         bili_ids, latein_ids, musik_ids,
+        latein_mode=latein_mode,
     )
 
     return [
