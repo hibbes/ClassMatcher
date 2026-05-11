@@ -337,6 +337,78 @@ def assign():
 # Klasse umbenennen
 # ──────────────────────────────────────────────────────────────────────────────
 
+@app.route("/api/refine-friends", methods=["POST"])
+def refine_friends():
+    """SA-Refinement vom aktuellen Stand, fokussiert nur auf Freundeswünsche.
+
+    Hard-Constraints und Locks bleiben aktiv. Klassengrößen ändern sich
+    nicht (nur Swaps). Antwort wie /api/assign.
+    """
+    from matcher import (
+        refine_friends_klasse8, calculate_classes, calculate_stats,
+    )
+
+    if not _state["students"] or not _state.get("last_assignment", {}).get("classes"):
+        return jsonify({"error": "Keine Zuweisung zum Verfeinern vorhanden"}), 400
+
+    try:
+        current_classes = [
+            {"id": c["id"], "students": [s["id"] for s in c["students"]]}
+            for c in _state["last_assignment"]["classes"]
+        ]
+
+        if _state["mode"] == "klasse8":
+            classes = refine_friends_klasse8(
+                _state["students"],
+                current_classes,
+                _state["params"],
+                _state["resolved_wishes"],
+                _state["dont_be_with"],
+                locked_students=_state["locked_students"],
+            )
+            _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in classes}
+        else:
+            # Modus 5: kein dedizierter Refiner – stattdessen Neu-Assign mit
+            # extrem hohem friend-Gewicht. Locks bleiben erhalten.
+            refine_params = dict(_state["params"])
+            refine_params["weightFriendWish"]    = 20
+            refine_params["weightGenderBalance"] = 0
+            refine_params["weightMusicSplit"]    = 0
+            classes = calculate_classes(
+                _state["students"], refine_params,
+                _state["resolved_wishes"], _state["dont_be_with"],
+                locked_students=_state["locked_students"],
+            )
+            _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
+
+        for cls in classes:
+            if cls["id"] in _state["class_names"]:
+                cls["name"] = _state["class_names"][cls["id"]]
+            elif cls["id"] in _DEFAULT_NAMES:
+                cls["name"] = _DEFAULT_NAMES[cls["id"]]
+
+        sm = _student_map()
+        response_classes = [
+            {"id": cls["id"], "name": cls.get("name", cls["id"]),
+             "track": cls["track"],
+             "students": [sm[sid] for sid in cls["students"] if sid in sm]}
+            for cls in classes
+        ]
+        _attach_wish_info(response_classes, sm)
+        stats = calculate_stats(
+            [{"id": c["id"], "students": [s["id"] for s in c["students"]]}
+             for c in response_classes],
+            sm, _state["resolved_wishes"], _state["dont_be_with"],
+        )
+        _state["last_assignment"] = {"classes": response_classes, "stats": stats}
+
+        return jsonify({"classes": response_classes, "stats": stats})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/rename-class", methods=["POST"])
 def rename_class():
     data     = request.json or {}

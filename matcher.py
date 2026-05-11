@@ -416,40 +416,72 @@ def optimize_mixed_assignment(
         return best_asgn
 
     # ── Simulated Annealing ──────────────────────────────────────
+    # 25 % der Schritte: 3er-Rotation statt 2er-Swap (knackt lokale Optima).
     free_ids   = {s["id"] for s in free}
     iterations = max(5_000, len(free) * 70)
     T          = 60.0
     T_min      = 0.05
     cool       = (T_min / T) ** (1.0 / iterations)
+    n_cls      = len(class_ids)
 
     for _ in range(iterations):
-        c1, c2 = random.sample(class_ids, 2)
-        pool1  = [i for i, sid in enumerate(z_asgn[c1]) if sid in free_ids]
-        pool2  = [i for i, sid in enumerate(z_asgn[c2]) if sid in free_ids]
-        if not pool1 or not pool2:
-            T = max(T_min, T * cool)
-            continue
+        use_rotate = (n_cls >= 3 and random.random() < 0.25)
 
-        i1, i2 = random.choice(pool1), random.choice(pool2)
-        sid1, sid2 = z_asgn[c1][i1], z_asgn[c2][i2]
-
-        # Hard-Constraints: kein Schüler in eine für ihn verbotene Klasse
-        if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
-            T = max(T_min, T * cool)
-            continue
-
-        z_asgn[c1][i1], z_asgn[c2][i2] = sid2, sid1
-
-        new_score = score(z_asgn)
-        delta     = new_score - cur_score
-
-        if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
-            cur_score = new_score
-            if cur_score > best_score:
-                best_score = cur_score
-                best_asgn  = {k: list(v) for k, v in z_asgn.items()}
+        if use_rotate:
+            c1, c2, c3 = random.sample(class_ids, 3)
+            p1 = [i for i, sid in enumerate(z_asgn[c1]) if sid in free_ids]
+            p2 = [i for i, sid in enumerate(z_asgn[c2]) if sid in free_ids]
+            p3 = [i for i, sid in enumerate(z_asgn[c3]) if sid in free_ids]
+            if not (p1 and p2 and p3):
+                T = max(T_min, T * cool)
+                continue
+            i1, i2, i3 = random.choice(p1), random.choice(p2), random.choice(p3)
+            sid1, sid2, sid3 = z_asgn[c1][i1], z_asgn[c2][i2], z_asgn[c3][i3]
+            # Rotation: sid1→c2, sid2→c3, sid3→c1
+            if (c2 in forbidden_for(sid1)
+                or c3 in forbidden_for(sid2)
+                or c1 in forbidden_for(sid3)):
+                T = max(T_min, T * cool)
+                continue
+            z_asgn[c1][i1] = sid3
+            z_asgn[c2][i2] = sid1
+            z_asgn[c3][i3] = sid2
+            new_score = score(z_asgn)
+            delta     = new_score - cur_score
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in z_asgn.items()}
+            else:
+                z_asgn[c1][i1], z_asgn[c2][i2], z_asgn[c3][i3] = sid1, sid2, sid3
         else:
-            z_asgn[c1][i1], z_asgn[c2][i2] = sid1, sid2
+            c1, c2 = random.sample(class_ids, 2)
+            pool1  = [i for i, sid in enumerate(z_asgn[c1]) if sid in free_ids]
+            pool2  = [i for i, sid in enumerate(z_asgn[c2]) if sid in free_ids]
+            if not pool1 or not pool2:
+                T = max(T_min, T * cool)
+                continue
+
+            i1, i2 = random.choice(pool1), random.choice(pool2)
+            sid1, sid2 = z_asgn[c1][i1], z_asgn[c2][i2]
+
+            if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+                T = max(T_min, T * cool)
+                continue
+
+            z_asgn[c1][i1], z_asgn[c2][i2] = sid2, sid1
+
+            new_score = score(z_asgn)
+            delta     = new_score - cur_score
+
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in z_asgn.items()}
+            else:
+                z_asgn[c1][i1], z_asgn[c2][i2] = sid1, sid2
 
         T = max(T_min, T * cool)
 
@@ -969,37 +1001,73 @@ def optimize_klasse8_assignment(
         return best_asgn
 
     # ── Simulated Annealing ──────────────────────────────────────
+    # Bei jedem Schritt mit 25 % Wahrscheinlichkeit eine 3er-Rotation
+    # (zyklischer Schub durch 3 Klassen) statt 2er-Swap – das knackt
+    # lokale Optima, die einfache Tausche nicht mehr verbessern können.
     iterations = max(5_000, len(free) * 80)
     T          = 70.0
     T_min      = 0.05
     cool       = (T_min / T) ** (1.0 / iterations)
 
+    n_cls = len(class_ids)
+
     for _ in range(iterations):
-        c1, c2 = random.sample(class_ids, 2)
-        pool1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-        pool2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
-        if not pool1 or not pool2:
-            T = max(T_min, T * cool)
-            continue
+        use_rotate = (n_cls >= 3 and random.random() < 0.25)
 
-        i1, i2 = random.choice(pool1), random.choice(pool2)
-        sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
-
-        if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
-            T = max(T_min, T * cool)
-            continue
-
-        asgn[c1][i1], asgn[c2][i2] = sid2, sid1
-        new_score = score(asgn)
-        delta     = new_score - cur_score
-
-        if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
-            cur_score = new_score
-            if cur_score > best_score:
-                best_score = cur_score
-                best_asgn  = {k: list(v) for k, v in asgn.items()}
+        if use_rotate:
+            c1, c2, c3 = random.sample(class_ids, 3)
+            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            p3 = [i for i, sid in enumerate(asgn[c3]) if sid in free_ids]
+            if not p1 or not p2 or not p3:
+                T = max(T_min, T * cool)
+                continue
+            i1, i2, i3 = random.choice(p1), random.choice(p2), random.choice(p3)
+            sid1, sid2, sid3 = asgn[c1][i1], asgn[c2][i2], asgn[c3][i3]
+            # Rotation: sid1→c2, sid2→c3, sid3→c1
+            if (c2 in forbidden_for(sid1)
+                or c3 in forbidden_for(sid2)
+                or c1 in forbidden_for(sid3)):
+                T = max(T_min, T * cool)
+                continue
+            asgn[c1][i1] = sid3
+            asgn[c2][i2] = sid1
+            asgn[c3][i3] = sid2
+            new_score = score(asgn)
+            delta     = new_score - cur_score
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in asgn.items()}
+            else:
+                asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
         else:
-            asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+            c1, c2 = random.sample(class_ids, 2)
+            pool1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+            pool2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            if not pool1 or not pool2:
+                T = max(T_min, T * cool)
+                continue
+
+            i1, i2 = random.choice(pool1), random.choice(pool2)
+            sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
+
+            if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+                T = max(T_min, T * cool)
+                continue
+
+            asgn[c1][i1], asgn[c2][i2] = sid2, sid1
+            new_score = score(asgn)
+            delta     = new_score - cur_score
+
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in asgn.items()}
+            else:
+                asgn[c1][i1], asgn[c2][i2] = sid1, sid2
 
         T = max(T_min, T * cool)
 
@@ -1151,6 +1219,170 @@ def calculate_classes_klasse8(
                         else ("8y" if cid in bili_classes else "8z"),
             "students": asgn.get(cid, []),
         }
+        for cid in class_ids
+    ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Klasse 8 – Refinement-Lauf nur für Freundeswünsche
+# ──────────────────────────────────────────────────────────────────────────────
+
+def refine_friends_klasse8(
+    students:        list,
+    current_classes: list,    # [{"id": "8a", "students": [sid, …]}, …]
+    params:          dict,
+    resolved_wishes: dict,
+    dont_be_with:    list,
+    locked_students: dict = None,
+) -> list:
+    """SA-Refinement vom aktuellen Stand mit reiner Friend-Optimierung.
+
+    Hard-Constraints (Bili/Latein/Musik je nach lateinMode) bleiben aktiv,
+    Locks bleiben fix, alle anderen Gewichte (Gender, Profile) sind 0.
+    Klassengrößen ändern sich nicht (SA-Swaps).
+    """
+    locked      = locked_students or {}
+    latein_mode = params.get("lateinMode", "strict")
+    student_map = {s["id"]: s for s in students}
+
+    bili_ids   = {s["id"] for s in students if s.get("bili")}
+    latein_ids = {s["id"] for s in students if s.get("latein")}
+    musik_ids  = {s["id"] for s in students if s.get("profil") == PROFIL_MUSIK}
+
+    class_ids = [c["id"] for c in current_classes]
+    asgn      = {c["id"]: list(c["students"]) for c in current_classes}
+
+    # Rollenklassen aus aktuellem Stand ableiten (robust gegen Drag-&-Drop)
+    bili_classes   = sorted({cid for cid in class_ids
+                             if any(sid in bili_ids for sid in asgn[cid])})
+    latein_classes = sorted({cid for cid in class_ids
+                             if any(sid in latein_ids for sid in asgn[cid])})
+    musik_class    = next(
+        (cid for cid in class_ids if any(sid in musik_ids for sid in asgn[cid])),
+        None,
+    )
+
+    locked_ids = set(locked.keys())
+    free_ids   = {sid for cid in class_ids for sid in asgn[cid]
+                  if sid not in locked_ids}
+
+    if len(class_ids) < 2 or not free_ids:
+        return [
+            {"id": cid, "name": cid,
+             "track": "8x" if cid == musik_class
+                      else ("8y" if cid in bili_classes else "8z"),
+             "students": asgn[cid]}
+            for cid in class_ids
+        ]
+
+    def forbidden_for(sid: str) -> set:
+        f: set = set()
+        is_bili   = sid in bili_ids
+        is_musik  = sid in musik_ids
+        is_latein = sid in latein_ids
+        if is_bili and bili_classes:
+            for c in class_ids:
+                if c not in bili_classes:
+                    f.add(c)
+        elif is_musik and musik_class:
+            for c in class_ids:
+                if c != musik_class:
+                    f.add(c)
+        if is_latein and latein_classes:
+            relax = (latein_mode == "musik_exception" and is_musik)
+            if not relax:
+                for c in class_ids:
+                    if c not in latein_classes:
+                        f.add(c)
+        return f
+
+    def score(z: dict) -> float:
+        sid2cls: dict = {}
+        for cid, sids in z.items():
+            for sid in sids:
+                sid2cls[sid] = cid
+        sc = 0.0
+        for sid, friends in resolved_wishes.items():
+            if sid not in sid2cls:
+                continue
+            for fid in friends:
+                if sid2cls.get(fid) == sid2cls[sid]:
+                    sc += 1.0
+        for pair in dont_be_with:
+            a, b = pair.get("a"), pair.get("b")
+            if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
+                sc -= 1_000_000  # bleibt unverletzbar
+        return sc
+
+    cur_score  = score(asgn)
+    best_asgn  = {k: list(v) for k, v in asgn.items()}
+    best_score = cur_score
+
+    iterations = max(8_000, len(free_ids) * 120)
+    T          = 4.0
+    T_min      = 0.02
+    cool       = (T_min / T) ** (1.0 / iterations)
+
+    for _ in range(iterations):
+        use_rotate = (len(class_ids) >= 3 and random.random() < 0.30)
+
+        if use_rotate:
+            c1, c2, c3 = random.sample(class_ids, 3)
+            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            p3 = [i for i, sid in enumerate(asgn[c3]) if sid in free_ids]
+            if not (p1 and p2 and p3):
+                T = max(T_min, T * cool)
+                continue
+            i1, i2, i3 = random.choice(p1), random.choice(p2), random.choice(p3)
+            sid1, sid2, sid3 = asgn[c1][i1], asgn[c2][i2], asgn[c3][i3]
+            if (c2 in forbidden_for(sid1)
+                or c3 in forbidden_for(sid2)
+                or c1 in forbidden_for(sid3)):
+                T = max(T_min, T * cool)
+                continue
+            asgn[c1][i1] = sid3
+            asgn[c2][i2] = sid1
+            asgn[c3][i3] = sid2
+            new_score = score(asgn)
+            delta     = new_score - cur_score
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in asgn.items()}
+            else:
+                asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
+        else:
+            c1, c2 = random.sample(class_ids, 2)
+            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            if not p1 or not p2:
+                T = max(T_min, T * cool)
+                continue
+            i1, i2 = random.choice(p1), random.choice(p2)
+            sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
+            if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+                T = max(T_min, T * cool)
+                continue
+            asgn[c1][i1], asgn[c2][i2] = sid2, sid1
+            new_score = score(asgn)
+            delta     = new_score - cur_score
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in asgn.items()}
+            else:
+                asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+
+        T = max(T_min, T * cool)
+
+    return [
+        {"id": cid, "name": cid,
+         "track": "8x" if cid == musik_class
+                  else ("8y" if cid in bili_classes else "8z"),
+         "students": best_asgn[cid]}
         for cid in class_ids
     ]
 

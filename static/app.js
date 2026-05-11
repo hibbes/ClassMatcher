@@ -111,6 +111,10 @@ const api = {
       body:    JSON.stringify({ classId, name }),
     });
   },
+  async refineFriends() {
+    const r = await fetch("/api/refine-friends", { method: "POST" });
+    return r.json();
+  },
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -157,6 +161,7 @@ function showView(v) {
 
   const afterUpload = v === "board";
   document.getElementById("btn-reassign").classList.toggle("hidden", !afterUpload);
+  document.getElementById("btn-refine-friends").classList.toggle("hidden", !afterUpload);
   document.getElementById("btn-clear-locks").classList.toggle("hidden", !afterUpload);
   document.getElementById("btn-save").classList.toggle("hidden", !afterUpload);
   document.getElementById("btn-print").classList.toggle("hidden", !afterUpload);
@@ -995,6 +1000,31 @@ async function init() {
 
   // ── Neu zuweisen ─────────────────────────────────────────
   document.getElementById("btn-reassign").addEventListener("click", () => doAssign());
+
+  // ── Freunde optimieren ───────────────────────────────────
+  document.getElementById("btn-refine-friends").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-refine-friends");
+    const before = state.stats.reduce((a, s) => a + (s.fulfilled_wishes || 0), 0);
+    const total  = state.stats.reduce((a, s) => a + (s.total_wishes || 0), 0);
+    btn.disabled = true;
+    showView("loading");
+    try {
+      const result = await api.refineFriends();
+      if (result.error) { alert("Fehler: " + result.error); showView("board"); return; }
+      state.classes = result.classes;
+      state.stats   = result.stats;
+      showView("board");
+      renderBoard();
+      const after = state.stats.reduce((a, s) => a + (s.fulfilled_wishes || 0), 0);
+      const delta = after - before;
+      updateSubtitle(`Freundes-Refinement: ${after}/${total} Wünsche (${delta >= 0 ? "+" : ""}${delta})`);
+    } catch (err) {
+      alert("Verbindungsfehler: " + err.message);
+      showView("board");
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // ── Locks zurücksetzen ────────────────────────────────────
   document.getElementById("btn-clear-locks").addEventListener("click", async () => {
