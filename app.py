@@ -6,6 +6,8 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
+APP_VERSION = "1.4"
+
 app = Flask(__name__, static_folder="static")
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -28,6 +30,8 @@ _state: dict = {
         "weightGenderBalance":     2,
         "weightMusicSplit":       50,    # 0..100 – Modus klasse5: Musikzug auf 2 Klassen
         "weightProfileCluster":   50,    # 0..100 – Modus klasse8: Profile zusammenhalten
+        "multiStart":              5,    # Modus klasse8: Anzahl Multi-Start-SA-Läufe
+        "autoRefine":              2,    # Modus klasse8: Friend-Refinement-Pässe pro Run
     },
 }
 
@@ -47,6 +51,11 @@ def _student_map():
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
+
+
+@app.route("/api/version")
+def version():
+    return jsonify({"version": APP_VERSION})
 
 @app.route("/<path:filename>")
 def static_files(filename):

@@ -23,6 +23,8 @@ const state = {
     weightGenderBalance:     2,
     weightMusicSplit:       50,
     weightProfileCluster:   50,
+    multiStart:              5,
+    autoRefine:              2,
   },
   view:           "upload",  // "upload" | "loading" | "board"
   dragStudentId:  null,

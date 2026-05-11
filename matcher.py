@@ -1078,6 +1078,21 @@ def optimize_klasse8_assignment(
 # Klasse 8 – Haupt-Einstiegspunkt
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _wish_score(classes: list, resolved_wishes: dict) -> int:
+    sid2cls: dict = {}
+    for c in classes:
+        for sid in c["students"]:
+            sid2cls[sid] = c["id"]
+    s = 0
+    for sid, friends in resolved_wishes.items():
+        if sid not in sid2cls:
+            continue
+        for fid in friends:
+            if sid2cls.get(fid) == sid2cls[sid]:
+                s += 1
+    return s
+
+
 def calculate_classes_klasse8(
     students:        list,
     params:          dict,
@@ -1085,13 +1100,46 @@ def calculate_classes_klasse8(
     dont_be_with:    list,
     locked_students: dict = None,
 ) -> list:
-    """Klassen 8 mischen.
+    """Klassen 8 mischen mit Multi-Start + automatischem Friend-Refinement.
 
-    Wählt Anzahl Klassen automatisch aus min/maxClassSize und Schülerzahl
-    so, dass die Größen möglichst gleichmäßig zwischen min und max liegen.
-    Reserviert bis zu 2 Klassen für Bili (= zugleich Latein-Klassen) und
-    1 Klasse für Musik.
+    Params:
+        multiStart  – Anzahl unabhängiger SA-Läufe mit verschiedenen Seeds
+                      (default 5). Die Lösung mit den meisten erfüllten
+                      Wünschen wird zurückgegeben.
+        autoRefine  – Anzahl Friend-Refinement-Pässe pro Run (default 2).
     """
+    multi_start = max(1, int(params.get("multiStart", 5)))
+    auto_refine = max(0, int(params.get("autoRefine", 2)))
+
+    best_classes = None
+    best_score   = -1
+    for run_idx in range(multi_start):
+        if multi_start > 1:
+            random.seed(20260511 + run_idx * 9973)
+        cl = _calculate_classes_klasse8_single(
+            students, params, resolved_wishes, dont_be_with, locked_students,
+        )
+        for _ in range(auto_refine):
+            cur = [{"id": c["id"], "students": list(c["students"])} for c in cl]
+            cl = refine_friends_klasse8(
+                students, cur, params, resolved_wishes, dont_be_with,
+                locked_students,
+            )
+        score = _wish_score(cl, resolved_wishes)
+        if score > best_score:
+            best_score   = score
+            best_classes = cl
+    return best_classes
+
+
+def _calculate_classes_klasse8_single(
+    students:        list,
+    params:          dict,
+    resolved_wishes: dict,
+    dont_be_with:    list,
+    locked_students: dict = None,
+) -> list:
+    """Ein einzelner SA-Lauf für Klasse-8 (ohne Multi-Start)."""
     locked     = locked_students or {}
     max_size   = int(params.get("maxClassSize", 30))
     min_size   = int(params.get("minClassSize", 22))
