@@ -16,6 +16,15 @@
   --c-5x:  #7c3aed;   /* Violet  – Musikzug    */
   --c-5y:  #0891b2;   /* Cyan    – Bilingual   */
   --c-5z:  #059669;   /* Emerald – Normalzug   */
+  --c-8x:  #7c3aed;   /* Violet  – Musik-Profil (Klasse 8) */
+  --c-8y:  #0891b2;   /* Cyan    – Bili-Klasse  (Klasse 8) */
+  --c-8z:  #059669;   /* Emerald – Normalklasse (Klasse 8) */
+
+  /* Profile (Klasse 8) */
+  --c-prof-nwt:  #0e7490;   /* NWT       */
+  --c-prof-sp:   #b45309;   /* Spanisch  */
+  --c-prof-imp:  #6d28d9;   /* IMP       */
+  --c-prof-mu:   #be185d;   /* Musik     */
 
   /* Geschlecht */
   --c-m:   #3b82f6;
@@ -535,6 +544,58 @@ html, body {
 
 .badge-F { background: #dbeafe; color: #1d4ed8; }
 .badge-L { background: #fef3c7; color: #92400e; }
+
+/* ─ Profil- und Zug-Badges für Klasse 8 ─ */
+.badge-bili    { background: #cffafe; color: #0e7490; }
+.badge-musik   { background: #fce7f3; color: #be185d; }
+.badge-nwt     { background: #e0f2fe; color: #0e7490; }
+.badge-sp      { background: #fef3c7; color: #b45309; }
+.badge-imp     { background: #ede9fe; color: #6d28d9; }
+.track-8x { background: var(--c-8x); }
+.track-8y { background: var(--c-8y); }
+.track-8z { background: var(--c-8z); }
+
+/* ─ Mode-Toggle im Upload-View ─ */
+.mode-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mode-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 22px;
+  border: 1.5px solid #cbd5e1;
+  background: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+  min-width: 240px;
+  max-width: 280px;
+}
+.mode-btn:hover { border-color: var(--primary); }
+.mode-btn.active {
+  border-color: var(--primary);
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+.mode-btn .mode-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #1e293b;
+}
+.mode-btn .mode-sub {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+.mode-btn.active .mode-title { color: #1d4ed8; }
 
 .lock-icon {
   font-size: 11px;

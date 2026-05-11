@@ -9,6 +9,7 @@
 // ──────────────────────────────────────────────────────────────────
 
 const state = {
+  mode:           "klasse5",  // "klasse5" | "klasse8"
   students:       [],      // alle Schüler:innen
   classes:        [],      // [{id, name, track, students:[…]}]
   stats:          [],      // [{classId, total, boys, girls, …}]
@@ -17,9 +18,11 @@ const state = {
   lockedStudents: {},      // {studentId: classId}
   params: {
     maxClassSize:           30,
+    minClassSize:           22,
     weightFriendWish:        5,
     weightGenderBalance:     3,
     weightMusicSplit:       50,
+    weightProfileCluster:   50,
   },
   view:           "upload",  // "upload" | "loading" | "board"
   dragStudentId:  null,
@@ -31,9 +34,10 @@ const state = {
 // ──────────────────────────────────────────────────────────────────
 
 const api = {
-  async upload(file) {
+  async upload(file, mode) {
     const fd = new FormData();
     fd.append("file", file);
+    fd.append("mode", mode || "klasse5");
     const r = await fetch("/api/upload", { method: "POST", body: fd });
     return r.json();
   },
@@ -114,13 +118,17 @@ const api = {
 // ──────────────────────────────────────────────────────────────────
 
 function trackClass(trackId) {
-  if (trackId.startsWith("5x")) return "5x";
-  if (trackId.startsWith("5y")) return "5y";
-  if (trackId.startsWith("5z")) return "5z";
+  if (!trackId) return "other";
+  if (trackId.startsWith("5x") || trackId === "8x") return "5x";
+  if (trackId.startsWith("5y") || trackId === "8y") return "5y";
+  if (trackId.startsWith("5z") || trackId === "8z") return "5z";
   return "other";
 }
 
 function trackLabel(track) {
+  if (state.mode === "klasse8") {
+    return { "5x": "Musik-Klasse", "5y": "Bili-Klasse", "5z": "Normalklasse" }[track] || track;
+  }
   return { "5x": "Musikzug", "5y": "Bili-Klasse", "5z": "Normalzug" }[track] || track;
 }
 
@@ -178,8 +186,22 @@ function renderClassCol(cls) {
   col.className = "class-col";
   col.dataset.classId = cls.id;
 
-  const countF = cls.students.filter(s => s.fremdsprache2 === "F").length;
-  const countL = cls.students.filter(s => s.fremdsprache2 === "L").length;
+  let extraStats = "";
+  if (state.mode === "klasse8") {
+    const cntBili   = cls.students.filter(s => s.bili).length;
+    const cntLatein = cls.students.filter(s => s.latein).length;
+    const cntMusik  = cls.students.filter(s => s.profil === "Musik").length;
+    extraStats = `
+      <span class="stat-item stat-lang-l" title="Latein als 2. Fremdsprache">L&nbsp;${cntLatein}</span>
+      ${cntBili  ? `<span class="stat-item stat-lang-f" title="Bili-Zug">Bili&nbsp;${cntBili}</span>` : ""}
+      ${cntMusik ? `<span class="stat-item" style="color:#be185d;font-weight:600" title="Musik-Profil">Mu&nbsp;${cntMusik}</span>` : ""}`;
+  } else {
+    const countF = cls.students.filter(s => s.fremdsprache2 === "F").length;
+    const countL = cls.students.filter(s => s.fremdsprache2 === "L").length;
+    extraStats = `
+      <span class="stat-item stat-lang-f" title="Französisch">F&nbsp;${countF}</span>
+      <span class="stat-item stat-lang-l" title="Latein">L&nbsp;${countL}</span>`;
+  }
 
   const wishInfo = st.total_wishes > 0
     ? `<span class="stat-item ${st.fulfilled_wishes === st.total_wishes ? "stat-good" : ""}">
@@ -201,8 +223,7 @@ function renderClassCol(cls) {
         <span class="stat-item">${st.total || 0} Schüler</span>
         <span class="stat-item stat-boys">♂${st.boys || 0}</span>
         <span class="stat-item stat-girls">♀${st.girls || 0}</span>
-        <span class="stat-item stat-lang-f" title="Französisch">F&nbsp;${countF}</span>
-        <span class="stat-item stat-lang-l" title="Latein">L&nbsp;${countL}</span>
+        ${extraStats}
         ${wishInfo}
         ${violInfo}
       </div>
@@ -254,7 +275,36 @@ const TRACK_LABELS = { "5x": "Musik", "5y": "Bili", "5z": "Normal" };
 const PROFIL_LONG  = { "5x": "Musikzug", "5y": "Bili-Klasse", "5z": "Normalzug" };
 const LANG_LABELS  = { "F": "Franzö.", "L": "Latein" };
 
+const PROFIL8_SHORT = {
+  "Naturwissenschaft und Technik (NWT)": "NWT",
+  "Spanisch": "Span",
+  "IMP":      "IMP",
+  "Musik":    "Musik",
+};
+const PROFIL8_CLASS = {
+  "Naturwissenschaft und Technik (NWT)": "nwt",
+  "Spanisch": "sp",
+  "IMP":      "imp",
+  "Musik":    "musik",
+};
+
 function buildBadgesHtml(student) {
+  if (state.mode === "klasse8") {
+    const profil      = student.profil || "";
+    const profilShort = PROFIL8_SHORT[profil] || profil;
+    const profilCls   = PROFIL8_CLASS[profil] || "other";
+    const profBadge   = profil
+      ? `<span class="badge badge-${profilCls}" title="${profil}">${profilShort}</span>`
+      : "";
+    const biliBadge   = student.bili
+      ? `<span class="badge badge-bili" title="Bili-Zug">Bili</span>`
+      : "";
+    const latBadge    = student.latein
+      ? `<span class="badge badge-L" title="Latein als 2. Fremdsprache">Latein</span>`
+      : "";
+    return `<div class="card-badges">${profBadge}${biliBadge}${latBadge}</div>`;
+  }
+
   const track     = trackClass(student.profil);
   const trackLabel = TRACK_LABELS[track] || track;
   const lang      = student.fremdsprache2 || "";
@@ -627,6 +677,7 @@ function setupParams() {
   function bindSlider(id, key, outputId, suffix = "") {
     const slider = document.getElementById(id);
     const output = document.getElementById(outputId);
+    if (!slider || !output) return;
     slider.value = state.params[key];
     output.textContent = state.params[key] + suffix;
 
@@ -634,14 +685,52 @@ function setupParams() {
       const val = Number(slider.value);
       state.params[key] = val;
       output.textContent = val + suffix;
+      // Min darf Max nicht überschreiten und umgekehrt
+      if (id === "p-minSize" && val > state.params.maxClassSize) {
+        state.params.maxClassSize = val;
+        const maxOut = document.getElementById("p-maxSize-val");
+        const maxSld = document.getElementById("p-maxSize");
+        if (maxOut) maxOut.textContent = val;
+        if (maxSld) maxSld.value       = val;
+      }
+      if (id === "p-maxSize" && val < state.params.minClassSize) {
+        state.params.minClassSize = val;
+        const minOut = document.getElementById("p-minSize-val");
+        const minSld = document.getElementById("p-minSize");
+        if (minOut) minOut.textContent = val;
+        if (minSld) minSld.value       = val;
+      }
       debouncedUpdate();
     });
   }
 
-  bindSlider("p-maxSize", "maxClassSize",        "p-maxSize-val");
-  bindSlider("p-friend",  "weightFriendWish",    "p-friend-val");
-  bindSlider("p-gender",  "weightGenderBalance", "p-gender-val");
-  bindSlider("p-music",   "weightMusicSplit",    "p-music-val", "%");
+  bindSlider("p-maxSize", "maxClassSize",         "p-maxSize-val");
+  bindSlider("p-minSize", "minClassSize",         "p-minSize-val");
+  bindSlider("p-friend",  "weightFriendWish",     "p-friend-val");
+  bindSlider("p-gender",  "weightGenderBalance",  "p-gender-val");
+  bindSlider("p-music",   "weightMusicSplit",     "p-music-val", "%");
+  bindSlider("p-profile", "weightProfileCluster", "p-profile-val", "%");
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Modus-spezifische UI-Sichtbarkeit
+// ──────────────────────────────────────────────────────────────────
+
+function applyModeUI() {
+  // Toggle-Knöpfe im Upload-View
+  const b5 = document.getElementById("mode-klasse5");
+  const b8 = document.getElementById("mode-klasse8");
+  if (b5 && b8) {
+    b5.classList.toggle("active", state.mode === "klasse5");
+    b8.classList.toggle("active", state.mode === "klasse8");
+    b5.setAttribute("aria-selected", state.mode === "klasse5");
+    b8.setAttribute("aria-selected", state.mode === "klasse8");
+  }
+  // Sidebar-Sliders je nach mode anzeigen/verstecken
+  document.querySelectorAll("[data-mode]").forEach(el => {
+    const m = el.getAttribute("data-mode");
+    el.classList.toggle("hidden", m !== state.mode);
+  });
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -675,10 +764,18 @@ function buildPrintView() {
 
     const rows = sorted.map((s, i) => {
       const gClass = s.geschlecht === "m" ? "m" : s.geschlecht === "w" ? "w" : "x";
-      const zugLabel = PROFIL_LONG[s.profil] || s.profil;
-      const langLabel = s.fremdsprache2 === "F" ? "Französisch"
-                      : s.fremdsprache2 === "L" ? "Latein"
-                      : s.fremdsprache2 || "–";
+
+      let zugLabel, langLabel;
+      if (state.mode === "klasse8") {
+        zugLabel = (PROFIL8_SHORT[s.profil] || s.profil || "–")
+                 + (s.bili ? " · Bili" : "");
+        langLabel = s.latein ? "Latein" : "Französisch";
+      } else {
+        zugLabel = PROFIL_LONG[s.profil] || s.profil;
+        langLabel = s.fremdsprache2 === "F" ? "Französisch"
+                  : s.fremdsprache2 === "L" ? "Latein"
+                  : s.fremdsprache2 || "–";
+      }
 
       // Wunschfreunde: erfüllt und nicht erfüllt (mit Trennungsgrund)
       const wishes = (s.wishInfo || []);
@@ -687,7 +784,6 @@ function buildPrintView() {
           return `<span class="pt-wish-yes">✓ ${w.friendName}</span>`;
         }
         const cls = w.friendClass ? ` (${w.friendClass})` : "";
-        // Grund nur anzeigen, wenn nicht schon im Klassenname enthalten
         const showReason = w.reason && w.reason !== w.friendClass;
         const reason = showReason ? ` <em class="pt-wish-reason">– ${w.reason}</em>` : "";
         return `<span class="pt-wish-no">✗ ${w.friendName}${cls}${reason}</span>`;
@@ -696,11 +792,15 @@ function buildPrintView() {
         ? `<td class="pt-wish">${wishParts.join(" ")}</td>`
         : `<td class="pt-wish-none">–</td>`;
 
+      const nameOut = state.mode === "klasse8"
+        ? `${s.name}, ${s.vorname}`
+        : `${s.name}, ${s.rufname || s.vorname}`;
+
       return `
         <tr>
           <td class="pt-num">${i + 1}.</td>
           <td class="pt-name">
-            <span class="print-dot ${gClass}"></span>${s.name}, ${s.rufname || s.vorname}
+            <span class="print-dot ${gClass}"></span>${nameOut}
           </td>
           <td class="pt-zug">${zugLabel}</td>
           <td class="pt-lang">${langLabel}</td>
@@ -710,6 +810,12 @@ function buildPrintView() {
 
     const wishSummary = st.total_wishes > 0
       ? ` · ${st.fulfilled_wishes} von ${st.total_wishes} Wünschen erfüllt` : "";
+
+    const headerLine = state.mode === "klasse8"
+      ? `Klasse 8 · Schuljahr ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`
+      : `Klasse 5 · Schuljahr ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`;
+
+    const zugColTitle = state.mode === "klasse8" ? "Profil" : "Zug";
 
     page.innerHTML = `
       <div class="print-header">
@@ -722,7 +828,7 @@ function buildPrintView() {
         </div>
         <div class="print-header-right">
           Schiller-Gymnasium Offenburg<br>
-          Klasse 5 · Schuljahr ${new Date().getFullYear()}/${new Date().getFullYear() + 1}<br>
+          ${headerLine}<br>
           ${today}
         </div>
       </div>
@@ -737,7 +843,7 @@ function buildPrintView() {
           <tr>
             <th>#</th>
             <th>Name, Vorname</th>
-            <th>Zug</th>
+            <th>${zugColTitle}</th>
             <th>2. Fremdsprache</th>
             <th>Freundeswünsche</th>
           </tr>
@@ -783,15 +889,17 @@ async function loadStateFromFile(file) {
       return;
     }
 
+    state.mode            = result.mode || data.mode || "klasse5";
     state.students        = result.classes.flatMap(c => c.students);
     state.lockedStudents  = data.locked_students || {};
     state.dontBeWith      = data.dont_be_with    || [];
-    state.params          = data.params          || state.params;
+    state.params          = Object.assign({}, state.params, data.params || {});
     state.classes         = result.classes;
     state.stats           = result.stats;
 
-    updateSubtitle(`${result.count} Schüler:innen`);
+    updateSubtitle(`${result.count} Schüler:innen · ${state.mode === "klasse8" ? "Klasse 8 mischen" : "Klasse 5 einteilen"}`);
     updateFuzzyBadge(result.pendingCount);
+    applyModeUI();
     setupParams();
     renderDontBeWithList();
     showView("board");
@@ -831,7 +939,18 @@ function updateSubtitle(text) {
 // ──────────────────────────────────────────────────────────────────
 
 async function init() {
+  applyModeUI();
   showView("upload");
+
+  // ── Mode-Toggle ───────────────────────────────────────────
+  document.getElementById("mode-klasse5").addEventListener("click", () => {
+    state.mode = "klasse5";
+    applyModeUI();
+  });
+  document.getElementById("mode-klasse8").addEventListener("click", () => {
+    state.mode = "klasse8";
+    applyModeUI();
+  });
 
   // ── Upload ────────────────────────────────────────────────
   const dropZone = document.getElementById("drop-zone");
@@ -843,7 +962,7 @@ async function init() {
     errorEl.classList.add("hidden");
     showView("loading");
 
-    const result = await api.upload(file);
+    const result = await api.upload(file, state.mode);
     if (result.error) {
       errorEl.textContent = result.error;
       errorEl.classList.remove("hidden");
@@ -851,10 +970,12 @@ async function init() {
       return;
     }
 
+    state.mode     = result.mode || state.mode;
     state.students = await (await fetch("/api/students")).json();
-    updateSubtitle(`${result.count} Schüler:innen`);
+    updateSubtitle(`${result.count} Schüler:innen · ${state.mode === "klasse8" ? "Klasse 8 mischen" : "Klasse 5 einteilen"}`);
     updateFuzzyBadge(result.pendingCount);
 
+    applyModeUI();
     setupParams();
     await doAssign();
   }

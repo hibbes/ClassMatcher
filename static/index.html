@@ -38,6 +38,13 @@
   <aside id="sidebar" class="hidden">
     <section class="sidebar-section">
       <h3>Klassengröße</h3>
+      <label data-mode="klasse8">
+        Min. Schüler/Klasse
+        <div class="input-row">
+          <input type="range" id="p-minSize" min="15" max="33" step="1" value="22" />
+          <output id="p-minSize-val">22</output>
+        </div>
+      </label>
       <label>
         Max. Schüler/Klasse
         <div class="input-row">
@@ -63,13 +70,27 @@
           <output id="p-gender-val">3</output>
         </div>
       </label>
-      <label title="Wie streng soll der Musikzug auf zwei Klassen (außer Bili) gleichmäßig verteilt werden?">
+      <label data-mode="klasse5" title="Wie streng soll der Musikzug auf zwei Klassen (außer Bili) gleichmäßig verteilt werden?">
         Musikzug-Verteilung
         <div class="input-row">
           <input type="range" id="p-music" min="0" max="100" step="25" value="50" list="music-ticks" />
           <output id="p-music-val">50%</output>
         </div>
         <datalist id="music-ticks">
+          <option value="0"></option>
+          <option value="25"></option>
+          <option value="50"></option>
+          <option value="75"></option>
+          <option value="100"></option>
+        </datalist>
+      </label>
+      <label data-mode="klasse8" title="Wie strikt sollen NWT/Spanisch/IMP-Profile in möglichst wenigen Klassen gruppiert werden?">
+        Profile zusammenhalten
+        <div class="input-row">
+          <input type="range" id="p-profile" min="0" max="100" step="25" value="50" list="profile-ticks" />
+          <output id="p-profile-val">50%</output>
+        </div>
+        <datalist id="profile-ticks">
           <option value="0"></option>
           <option value="25"></option>
           <option value="50"></option>
@@ -95,6 +116,16 @@
 
     <!-- Upload-Ansicht -->
     <div id="upload-view">
+      <div class="mode-toggle" role="tablist" aria-label="Modus wählen">
+        <button id="mode-klasse5" class="mode-btn active" role="tab" aria-selected="true">
+          <span class="mode-title">5. Klassen einteilen</span>
+          <span class="mode-sub">aus Anmeldungs-CSV mit Profil1, Klassenpartner</span>
+        </button>
+        <button id="mode-klasse8" class="mode-btn" role="tab" aria-selected="false">
+          <span class="mode-title">8. Klassen neu mischen</span>
+          <span class="mode-sub">aus Profilwahl-CSV (Bili, Latein, Musik, IMP)</span>
+        </button>
+      </div>
       <div id="drop-zone">
         <div class="drop-icon">📋</div>
         <p class="drop-title">CSV-Datei hier ablegen</p>

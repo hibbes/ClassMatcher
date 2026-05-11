@@ -650,3 +650,504 @@ def calculate_stats(
         })
 
     return stats
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════ MODUS „KLASSE 8 NEU MISCHEN" ═══════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Eingabe: CSV der Profilwahl in Klasse 7. Spalten (;-separiert, UTF-8 mit BOM):
+#   Nachname; Vorname; Klasse/Information (z.B. 7a); Ich bin … (männlich/weiblich);
+#   Ich bin im Bili - Zug (Ja/Nein);
+#   Ich habe Latein als Zweitsprache (Ja/Nein);
+#   Ich habe vor, das Schiller nach der 7. Klasse zu verlassen. (Ja/Nein);
+#   Ich wähle folgendes Profil ab der 8. Klasse. (NWT/Spanisch/IMP/Musik);
+#   Ich möchte bitte mit folgenden Freunden in eine Klasse kommen.;
+#   Ich hätte IMP gewählt. (Ja/Nein)
+#
+# Constraints:
+#   – Verlasser und Nicht-Wähler werden ignoriert
+#   – Musik-Profilianten und Bili-SuS dürfen NIE gemeinsam in einer Klasse sein
+#   – Bili-SuS in maximal 2 Klassen
+#   – Latein-SuS in maximal 2 Klassen
+#   – Klassengröße zwischen minClassSize und maxClassSize
+#   – Profile (NWT/Spanisch/IMP) möglichst zusammenhalten (Soft, einstellbar)
+#   – Freundeswünsche, m/w-Balance, Nicht-zusammen-Paare wie in Modus 5
+
+PROFIL_MUSIK   = "Musik"
+PROFIL_NWT     = "Naturwissenschaft und Technik (NWT)"
+PROFIL_SPANISCH = "Spanisch"
+PROFIL_IMP     = "IMP"
+
+
+def _ja(value: str) -> bool:
+    return (value or "").strip().lower() == "ja"
+
+
+def parse_csv_klasse8(content: str) -> list:
+    """CSV aus dem Profilwahl-Formular parsen.
+
+    Liefert eine Liste von Schüler-Dicts mit den Feldern, die der
+    Klasse-8-Algorithmus braucht. Verlasser und Nicht-Wähler werden
+    übersprungen (gehen nicht in die Liste).
+    """
+    content = content.lstrip("﻿")
+    reader = csv.DictReader(io.StringIO(content), delimiter=";")
+
+    bili_col     = "Ich bin im Bili - Zug"
+    latein_col   = "Ich habe Latein als Zweitsprache"
+    leave_col    = "Ich habe vor, das Schiller nach der 7. Klasse zu verlassen."
+    profile_col  = "Ich wähle folgendes Profil ab der 8. Klasse."
+    friends_col  = "Ich möchte bitte mit folgenden Freunden in eine Klasse kommen."
+    klasse_col   = "Klasse/Information"
+    gender_col   = "Ich bin ..."
+
+    students = []
+    seen_ids: set = set()
+
+    for row in reader:
+        name    = (row.get("Nachname") or "").strip()
+        vorname = (row.get("Vorname")  or "").strip()
+        if not name or not vorname:
+            continue
+
+        profil = (row.get(profile_col) or "").strip()
+        if _ja(row.get(leave_col)):
+            continue
+        if not profil:
+            continue
+
+        gender_raw = (row.get(gender_col) or "").strip().lower()
+        if gender_raw.startswith("m"):
+            geschlecht = "m"
+        elif gender_raw.startswith("w"):
+            geschlecht = "w"
+        else:
+            geschlecht = ""
+
+        # ID: Nachname-Vorname-AlteKlasse normalisiert; Kollisionen mit Index
+        klasse_alt = (row.get(klasse_col) or "").strip()
+        base_id = f"{normalize(name)}-{normalize(vorname)}-{klasse_alt.lower()}"
+        sid = base_id
+        idx = 2
+        while sid in seen_ids:
+            sid = f"{base_id}-{idx}"
+            idx += 1
+        seen_ids.add(sid)
+
+        students.append({
+            "id":             sid,
+            "name":           name,
+            "vorname":        vorname,
+            "rufname":        "",
+            "displayName":    f"{vorname} {name}",
+            "geschlecht":     geschlecht,
+            "profil":         profil,
+            "klassenpartner": (row.get(friends_col) or "").strip(),
+            "vorhKlasse":     klasse_alt,
+            "abgebendeSchule":"",
+            "geburtsdatum":   "",
+            "fremdsprache2":  "L" if _ja(row.get(latein_col)) else "F",
+            "bili":           _ja(row.get(bili_col)),
+            "latein":         _ja(row.get(latein_col)),
+            "imp_alternativ": _ja(row.get("Ich hätte IMP gewählt.")),
+        })
+
+    return students
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Klasse 8 – Bewertungsfunktion
+# ──────────────────────────────────────────────────────────────────────────────
+
+def score_klasse8(
+    assignment:       dict,
+    resolved_wishes:  dict,
+    dont_be_with:     list,
+    w_friend:         float,
+    w_gender:         float,
+    w_profile:        float,
+    student_map:      dict,
+) -> float:
+    """Score: Freundeswünsche + Gender-Balance + Profile-Cluster + Nicht-Zusammen.
+
+    Hard-Constraints (Musik nur in Musik-Klasse, Bili nur in Bili-Klassen,
+    Latein nur in Latein-Klassen) werden außerhalb in der SA-Schleife
+    enforced (forbidden_for).
+    """
+    sc = 0.0
+
+    sid2cls: dict = {}
+    for cid, sids in assignment.items():
+        for sid in sids:
+            sid2cls[sid] = cid
+
+    # Freundeswünsche
+    if w_friend > 0:
+        for sid, friends in resolved_wishes.items():
+            if sid not in sid2cls:
+                continue
+            for fid in friends:
+                if sid2cls.get(fid) == sid2cls[sid]:
+                    sc += w_friend
+
+    # "Nicht zusammen"-Verstöße
+    for pair in dont_be_with:
+        a, b = pair.get("a"), pair.get("b")
+        if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
+            sc -= 10_000
+
+    # Geschlechterbalance
+    if w_gender > 0:
+        for cid, sids in assignment.items():
+            cls_students = [student_map[s] for s in sids if s in student_map]
+            boys  = sum(1 for s in cls_students if s["geschlecht"] == "m")
+            girls = sum(1 for s in cls_students if s["geschlecht"] == "w")
+            total = boys + girls
+            if total:
+                balance = 1.0 - abs(boys - girls) / total
+                sc += w_gender * balance * 10
+
+    # Profile zusammenhalten: pro Profil zählen wir, in wie vielen Klassen
+    # SuS dieses Profils landen; je weniger Klassen → besser. Bonus pro
+    # Klasse, in der mind. die Hälfte des Profils landet.
+    if w_profile > 0:
+        profile_counter: dict = defaultdict(lambda: Counter())
+        for sid, cid in sid2cls.items():
+            s = student_map.get(sid)
+            if s is None:
+                continue
+            p = s.get("profil") or ""
+            if p in (PROFIL_NWT, PROFIL_SPANISCH, PROFIL_IMP):
+                profile_counter[p][cid] += 1
+
+        for p, counts in profile_counter.items():
+            total_p = sum(counts.values())
+            if total_p == 0:
+                continue
+            # Konzentration: Anteil größter Cluster
+            max_cluster = max(counts.values())
+            concentration = max_cluster / total_p     # 0..1
+            # Spread-Penalty: viele kleine Cluster sind teuer
+            spread = len(counts)
+            sc += (w_profile * w_profile / 100.0) * (concentration * 10 - spread)
+
+    return sc
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Klasse 8 – Simulated Annealing
+# ──────────────────────────────────────────────────────────────────────────────
+
+def optimize_klasse8_assignment(
+    students:         list,
+    class_ids:        list,
+    capacities:       dict,
+    locked:           dict,
+    resolved_wishes:  dict,
+    dont_be_with:     list,
+    w_friend:         float,
+    w_gender:         float,
+    w_profile:        float,
+    student_map:      dict,
+    bili_classes:     list,
+    latein_classes:   list,
+    musik_class:      str | None,
+    bili_ids:         set,
+    latein_ids:       set,
+    musik_ids:        set,
+) -> dict:
+    """SA-Verteilung für Klasse 8.
+
+    Hard-Constraints:
+      – Bili-SuS nur in bili_classes
+      – Latein-SuS nur in latein_classes
+      – Musik-SuS nur in musik_class
+    """
+    if not students:
+        return {cid: [] for cid in class_ids}
+
+    locked_ids = set(locked.keys())
+    free       = [s for s in students if s["id"] not in locked_ids]
+    free_ids   = {s["id"] for s in free}
+
+    def forbidden_for(sid: str) -> set:
+        f: set = set()
+        is_bili   = sid in bili_ids
+        is_musik  = sid in musik_ids
+        is_latein = sid in latein_ids
+        # Bili dominiert über Musik, falls beides gewählt (in Praxis
+        # nicht vorgesehen, aber defensiv): Bili-Klasse statt Musik-Klasse.
+        if is_bili and bili_classes:
+            for c in class_ids:
+                if c not in bili_classes:
+                    f.add(c)
+        elif is_musik and musik_class:
+            for c in class_ids:
+                if c != musik_class:
+                    f.add(c)
+        # Latein-Klassen-Constraint gilt nicht für Musik-Profilianten:
+        # sie müssen in die Musik-Klasse (sonst Musik+Bili-Konflikt in den
+        # Bili/Latein-Klassen) und können dort nicht ausgeschlossen werden.
+        if is_latein and not is_musik and latein_classes:
+            for c in class_ids:
+                if c not in latein_classes:
+                    f.add(c)
+        return f
+
+    # ── Startbelegung ────────────────────────────────────────────
+    asgn: dict = {cid: [] for cid in class_ids}
+    rem_cap   = dict(capacities)
+
+    # 1) Locked zuerst
+    for sid, cid in locked.items():
+        if cid in asgn and rem_cap.get(cid, 0) > 0:
+            asgn[cid].append(sid)
+            rem_cap[cid] -= 1
+
+    # 2) Disjunkte Buckets in Reihenfolge mit absteigender Constraint-Strenge:
+    #    Musik > Bili+Latein > Bili-only > Latein-only > Rest.
+    #    Bili dominiert bei Konflikt (Bili+Musik landet im Bili-Bucket).
+    music_grp   = [s for s in free
+                   if s["id"] in musik_ids and s["id"] not in bili_ids]
+    bili_lat    = [s for s in free
+                   if s["id"] in bili_ids and s["id"] in latein_ids]
+    bili_only   = [s for s in free
+                   if s["id"] in bili_ids and s["id"] not in latein_ids]
+    latein_only = [s for s in free
+                   if s["id"] in latein_ids
+                   and s["id"] not in bili_ids
+                   and s["id"] not in musik_ids]
+    rest        = [s for s in free
+                   if s["id"] not in musik_ids
+                   and s["id"] not in bili_ids
+                   and s["id"] not in latein_ids]
+
+    for grp in (music_grp, bili_lat, bili_only, latein_only, rest):
+        random.shuffle(grp)
+
+    # Profile-aware Reihenfolge im "rest": NWT/Spanisch/IMP gruppiert
+    rest.sort(key=lambda s: s.get("profil") or "")
+
+    def place(slist, allowed):
+        if not slist or not allowed:
+            return
+        order = sorted(allowed, key=lambda c: -rem_cap.get(c, 0))
+        idx = 0
+        while idx < len(slist):
+            placed = False
+            for cid in order:
+                if rem_cap.get(cid, 0) > 0 and idx < len(slist):
+                    asgn[cid].append(slist[idx]["id"])
+                    rem_cap[cid] -= 1
+                    idx += 1
+                    placed = True
+            if not placed:
+                # Letzter Ausweg: irgendeine erlaubte Klasse mit Platz
+                for cid in allowed:
+                    if rem_cap.get(cid, 0) > 0 and idx < len(slist):
+                        asgn[cid].append(slist[idx]["id"])
+                        rem_cap[cid] -= 1
+                        idx += 1
+                        break
+                else:
+                    break
+
+    place(music_grp,   [musik_class] if musik_class else class_ids)
+    place(bili_lat,    bili_classes  if bili_classes  else (latein_classes or class_ids))
+    place(bili_only,   bili_classes  if bili_classes  else class_ids)
+    place(latein_only, latein_classes if latein_classes else class_ids)
+    # Rest darf in alle Klassen – das _place sortiert nach freier Kapazität,
+    # also wird die freie Klasse (kein Bili/Musik) zuerst gefüllt.
+    place(rest,        class_ids)
+
+    def score(z):
+        return score_klasse8(
+            z, resolved_wishes, dont_be_with,
+            w_friend, w_gender, w_profile, student_map,
+        )
+
+    cur_score  = score(asgn)
+    best_asgn  = {k: list(v) for k, v in asgn.items()}
+    best_score = cur_score
+
+    if len(class_ids) < 2 or not free:
+        return best_asgn
+
+    # ── Simulated Annealing ──────────────────────────────────────
+    iterations = max(5_000, len(free) * 80)
+    T          = 70.0
+    T_min      = 0.05
+    cool       = (T_min / T) ** (1.0 / iterations)
+
+    for _ in range(iterations):
+        c1, c2 = random.sample(class_ids, 2)
+        pool1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+        pool2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+        if not pool1 or not pool2:
+            T = max(T_min, T * cool)
+            continue
+
+        i1, i2 = random.choice(pool1), random.choice(pool2)
+        sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
+
+        if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+            T = max(T_min, T * cool)
+            continue
+
+        asgn[c1][i1], asgn[c2][i2] = sid2, sid1
+        new_score = score(asgn)
+        delta     = new_score - cur_score
+
+        if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+            cur_score = new_score
+            if cur_score > best_score:
+                best_score = cur_score
+                best_asgn  = {k: list(v) for k, v in asgn.items()}
+        else:
+            asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+
+        T = max(T_min, T * cool)
+
+    return best_asgn
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Klasse 8 – Haupt-Einstiegspunkt
+# ──────────────────────────────────────────────────────────────────────────────
+
+def calculate_classes_klasse8(
+    students:        list,
+    params:          dict,
+    resolved_wishes: dict,
+    dont_be_with:    list,
+    locked_students: dict = None,
+) -> list:
+    """Klassen 8 mischen.
+
+    Wählt Anzahl Klassen automatisch aus min/maxClassSize und Schülerzahl
+    so, dass die Größen möglichst gleichmäßig zwischen min und max liegen.
+    Reserviert bis zu 2 Klassen für Bili (= zugleich Latein-Klassen) und
+    1 Klasse für Musik.
+    """
+    locked     = locked_students or {}
+    max_size   = int(params.get("maxClassSize", 30))
+    min_size   = int(params.get("minClassSize", 22))
+    w_friend   = params.get("weightFriendWish",     5)
+    w_gender   = params.get("weightGenderBalance",  3)
+    w_profile  = params.get("weightProfileCluster", 50)
+
+    n = len(students)
+    if n == 0:
+        return []
+
+    # Anzahl Klassen so wählen, dass avg <= max und avg >= min (falls möglich).
+    # Bevorzugt: kleinstes k, für das n/k <= max_size.
+    num_classes = max(1, math.ceil(n / max_size))
+    while min_size and num_classes > 1 and n / num_classes < min_size:
+        num_classes -= 1
+        if math.ceil(n / num_classes) > max_size:
+            num_classes += 1   # rollback – sonst max verletzt
+            break
+
+    class_ids = [f"8{chr(ord('a') + i)}" for i in range(num_classes)]
+
+    student_map = {s["id"]: s for s in students}
+
+    bili_ids   = {s["id"] for s in students if s.get("bili")}
+    latein_ids = {s["id"] for s in students if s.get("latein")}
+    musik_ids  = {s["id"] for s in students if s.get("profil") == PROFIL_MUSIK}
+
+    # Bili in max 2 Klassen
+    n_bili_classes = min(2, num_classes) if bili_ids else 0
+    bili_classes   = class_ids[:n_bili_classes]
+
+    # Musik-Klasse: erste Nicht-Bili-Klasse
+    musik_class = None
+    if musik_ids:
+        non_bili = [c for c in class_ids if c not in bili_classes]
+        musik_class = non_bili[0] if non_bili else None
+
+    # Latein-Klassen: zuerst die Bili-Klassen (12 Bili+Latein-SuS müssen
+    # dorthin), dann auffüllen auf max 2.
+    latein_classes = list(bili_classes)
+    if latein_ids:
+        for c in class_ids:
+            if len(latein_classes) >= 2:
+                break
+            if c in latein_classes:
+                continue
+            if c == musik_class:
+                continue   # Musik-Klasse möglichst latein-frei lassen
+            latein_classes.append(c)
+        if not latein_classes:
+            latein_classes = [class_ids[-1]]   # fallback
+
+    capacities = {cid: max_size for cid in class_ids}
+
+    # Gesperrte SuS, die zu unserer aktiven Liste gehören
+    active_ids = set(student_map.keys())
+    locked_active = {sid: cid for sid, cid in locked.items()
+                     if sid in active_ids and cid in class_ids}
+
+    asgn = optimize_klasse8_assignment(
+        students, class_ids, capacities, locked_active,
+        resolved_wishes, dont_be_with,
+        w_friend, w_gender, w_profile,
+        student_map,
+        bili_classes, latein_classes, musik_class,
+        bili_ids, latein_ids, musik_ids,
+    )
+
+    return [
+        {
+            "id":       cid,
+            "name":     cid,
+            "track":    "8x" if cid == musik_class
+                        else ("8y" if cid in bili_classes else "8z"),
+            "students": asgn.get(cid, []),
+        }
+        for cid in class_ids
+    ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Klasse 8 – Trennungsgrund für nicht erfüllte Wünsche
+# ──────────────────────────────────────────────────────────────────────────────
+
+def wish_reason_klasse8(
+    student:         dict,
+    friend:          dict,
+    student_class:   str,
+    friend_class:    str,
+    bili_classes:    list,
+    latein_classes:  list,
+    musik_class:     str | None,
+    resolved_wishes: dict,
+) -> str | None:
+    """Strukturellen Grund für getrennte Klassen bestimmen."""
+    s_bili = student.get("bili")
+    f_bili = friend.get("bili")
+    if s_bili != f_bili:
+        return "Bili-Klasse"
+
+    s_mus = student.get("profil") == PROFIL_MUSIK
+    f_mus = friend.get("profil") == PROFIL_MUSIK
+    if s_mus != f_mus:
+        return "Musik-Profil"
+
+    s_lat = student.get("latein")
+    f_lat = friend.get("latein")
+    if s_lat != f_lat:
+        # Trennung nur, wenn der Latein-SuS in eine Latein-Klasse muss und der
+        # andere nicht; ansonsten ist es Optimierungs-Tradeoff
+        if (s_lat and student_class in latein_classes and friend_class not in latein_classes) \
+           or (f_lat and friend_class in latein_classes and student_class not in latein_classes):
+            return "Latein"
+
+    # Einseitig
+    if student["id"] not in resolved_wishes.get(friend["id"], []):
+        return "einseitiger Wunsch"
+
+    return None
+

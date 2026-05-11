@@ -13,6 +13,7 @@ app = Flask(__name__, static_folder="static")
 # ──────────────────────────────────────────────────────────────────────────────
 
 _state: dict = {
+    "mode":            "klasse5",  # "klasse5" | "klasse8"
     "students":        [],
     "resolved_wishes": {},   # {student_id: [matched_ids]}
     "pending_wishes":  {},   # {student_id: [{token, candidates}]}
@@ -22,9 +23,11 @@ _state: dict = {
     "last_assignment": {},   # {classes: […], stats: […]}  ← zuletzt berechnete Zuweisung
     "params": {
         "maxClassSize":           30,
+        "minClassSize":           22,    # nur Modus klasse8 relevant
         "weightFriendWish":        5,
         "weightGenderBalance":     3,
-        "weightMusicSplit":       50,   # 0..100 – Musikzug auf 2 Klassen verteilt
+        "weightMusicSplit":       50,    # 0..100 – Modus klasse5: Musikzug auf 2 Klassen
+        "weightProfileCluster":   50,    # 0..100 – Modus klasse8: Profile zusammenhalten
     },
 }
 
@@ -56,7 +59,7 @@ def static_files(filename):
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
-    from matcher import parse_csv, process_wishes
+    from matcher import parse_csv, parse_csv_klasse8, process_wishes
 
     if "file" not in request.files:
         return jsonify({"error": "Keine Datei angegeben"}), 400
@@ -65,12 +68,20 @@ def upload():
     if not f.filename.lower().endswith(".csv"):
         return jsonify({"error": "Nur CSV-Dateien werden unterstützt"}), 400
 
+    mode = (request.form.get("mode") or "klasse5").strip()
+    if mode not in ("klasse5", "klasse8"):
+        return jsonify({"error": f"Unbekannter Modus: {mode}"}), 400
+
     try:
-        content  = f.read().decode("utf-8-sig")
-        students = parse_csv(content)
+        content = f.read().decode("utf-8-sig")
+        if mode == "klasse8":
+            students = parse_csv_klasse8(content)
+        else:
+            students = parse_csv(content)
         if not students:
             return jsonify({"error": "Keine Schüler gefunden – bitte CSV prüfen"}), 400
 
+        _state["mode"]            = mode
         _state["students"]        = students
         _state["resolved_wishes"], _state["pending_wishes"] = process_wishes(students)
         _state["locked_students"] = {}
@@ -82,6 +93,7 @@ def upload():
         return jsonify({
             "count":        len(students),
             "pendingCount": pending_count,
+            "mode":         mode,
         })
     except Exception as e:
         traceback.print_exc()
@@ -179,9 +191,34 @@ def _latin_free_class_id(classes: list) -> str | None:
     return fill_ids[-1] if len(fill_ids) >= 2 else None
 
 
+def _klasse8_role_classes(response_classes: list, students_list: list) -> tuple:
+    """Aus aktuellem Board ableiten, welche Klassen Bili/Latein/Musik tragen.
+
+    Liefert (bili_classes, latein_classes, musik_class) — robust gegen
+    manuelle Verschiebungen.
+    """
+    bili_set:   set = set()
+    latein_set: set = set()
+    musik_set:  set = set()
+    from matcher import PROFIL_MUSIK
+    for cls in response_classes:
+        for s in cls["students"]:
+            cid = cls["id"]
+            if s.get("bili"):
+                bili_set.add(cid)
+            if s.get("latein"):
+                latein_set.add(cid)
+            if s.get("profil") == PROFIL_MUSIK:
+                musik_set.add(cid)
+    bili_classes   = sorted(bili_set)
+    latein_classes = sorted(latein_set)
+    musik_class    = next(iter(musik_set), None)
+    return bili_classes, latein_classes, musik_class
+
+
 def _attach_wish_info(response_classes: list, sm: dict) -> None:
     """Erfüllt-Status + Trennungsgrund zu jedem Schüler in response_classes hängen."""
-    from matcher import wish_reason
+    from matcher import wish_reason, wish_reason_klasse8
 
     sid_to_cls_id   = {}
     sid_to_cls_name = {}
@@ -190,8 +227,23 @@ def _attach_wish_info(response_classes: list, sm: dict) -> None:
             sid_to_cls_id[s["id"]]   = cls["id"]
             sid_to_cls_name[s["id"]] = cls["name"]
 
-    latin_free = _latin_free_class_id(response_classes)
-    resolved   = _state["resolved_wishes"]
+    resolved = _state["resolved_wishes"]
+
+    if _state["mode"] == "klasse8":
+        bili_cls, latein_cls, musik_cls = _klasse8_role_classes(
+            response_classes, _state["students"]
+        )
+
+        def reason_fn(s, friend, s_cid, f_cid):
+            return wish_reason_klasse8(
+                s, friend, s_cid, f_cid,
+                bili_cls, latein_cls, musik_cls, resolved,
+            )
+    else:
+        latin_free = _latin_free_class_id(response_classes)
+
+        def reason_fn(s, friend, s_cid, f_cid):
+            return wish_reason(s, friend, s_cid, f_cid, latin_free, resolved)
 
     for cls in response_classes:
         for s in cls["students"]:
@@ -208,17 +260,14 @@ def _attach_wish_info(response_classes: list, sm: dict) -> None:
                     "friendClass": None if fulfilled else sid_to_cls_name.get(fid),
                 }
                 if not fulfilled:
-                    entry["reason"] = wish_reason(
-                        s, sm[fid], cls["id"], f_cls_id,
-                        latin_free, resolved,
-                    )
+                    entry["reason"] = reason_fn(s, sm[fid], cls["id"], f_cls_id)
                 wish_info.append(entry)
             s["wishInfo"] = wish_info
 
 
 @app.route("/api/assign", methods=["POST"])
 def assign():
-    from matcher import calculate_classes, calculate_stats
+    from matcher import calculate_classes, calculate_classes_klasse8, calculate_stats
 
     if not _state["students"]:
         return jsonify({"error": "Keine Schüler geladen"}), 400
@@ -227,16 +276,26 @@ def assign():
         data   = request.json or {}
         locked = data.get("lockedStudents", _state["locked_students"])
 
-        classes = calculate_classes(
-            _state["students"],
-            _state["params"],
-            _state["resolved_wishes"],
-            _state["dont_be_with"],
-            locked_students=locked,
-        )
+        if _state["mode"] == "klasse8":
+            classes = calculate_classes_klasse8(
+                _state["students"],
+                _state["params"],
+                _state["resolved_wishes"],
+                _state["dont_be_with"],
+                locked_students=locked,
+            )
+            _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in classes}
+        else:
+            classes = calculate_classes(
+                _state["students"],
+                _state["params"],
+                _state["resolved_wishes"],
+                _state["dont_be_with"],
+                locked_students=locked,
+            )
+            _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
 
         # Standard-Klassennamen, sofern nicht manuell umbenannt
-        _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
         for cls in classes:
             if cls["id"] in _state["class_names"]:
                 cls["name"] = _state["class_names"][cls["id"]]
@@ -323,7 +382,8 @@ def clear_locks():
 def save_state():
     """Aktuellen Stand als JSON zurückgeben (zum Download)."""
     return jsonify({
-        "version":         1,
+        "version":         2,
+        "mode":            _state["mode"],
         "students":        _state["students"],
         "resolved_wishes": _state["resolved_wishes"],
         "pending_wishes":  _state["pending_wishes"],
@@ -342,6 +402,7 @@ def load_state():
 
     data = request.json or {}
 
+    _state["mode"]            = data.get("mode", "klasse5")
     _state["students"]        = data.get("students", [])
     _state["resolved_wishes"] = data.get("resolved_wishes", {})
     _state["pending_wishes"]  = data.get("pending_wishes", {})
@@ -359,7 +420,10 @@ def load_state():
     sm = _student_map()
 
     # Klassenname aus class_names anwenden (analog zu assign())
-    _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
+    if _state["mode"] == "klasse8":
+        _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in saved_classes}
+    else:
+        _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
     for cls in saved_classes:
         if cls["id"] in _state["class_names"]:
             cls["name"] = _state["class_names"][cls["id"]]
@@ -385,6 +449,7 @@ def load_state():
         "stats":        stats,
         "count":        len(_state["students"]),
         "pendingCount": pending_count,
+        "mode":         _state["mode"],
     })
 
 
