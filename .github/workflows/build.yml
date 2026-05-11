@@ -3,6 +3,7 @@ name: Build (macOS + Windows)
 on:
   push:
     branches: [main]
+    tags:     ['v*']
   workflow_dispatch:
 
 jobs:
@@ -20,6 +21,13 @@ jobs:
       - name: Abhängigkeiten installieren
         run: pip install flask pyinstaller pillow
 
+      - name: App-Version auslesen
+        id: ver
+        run: |
+          V=$(python -c "import re; print(re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open('app.py').read()).group(1))")
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "App-Version: $V"
+
       - name: Icon erstellen (PNG → ICNS)
         run: |
           mkdir -p /tmp/AppIcon.iconset
@@ -32,12 +40,14 @@ jobs:
           iconutil -c icns /tmp/AppIcon.iconset -o /tmp/AppIcon.icns
 
       - name: PyInstaller-Build
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           pyinstaller \
             --noconfirm \
             --onedir \
             --windowed \
-            --name "Schiller-Klassen-Mixer" \
+            --name "Schiller-Klassen-Mixer-v${VERSION}" \
             --icon /tmp/AppIcon.icns \
             --add-data "static:static" \
             --add-data "app.py:." \
@@ -45,19 +55,21 @@ jobs:
             launcher.py
 
       - name: DMG erstellen
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           hdiutil create \
-            -volname "Schiller-Klassen-Mixer" \
-            -srcfolder "dist/Schiller-Klassen-Mixer.app" \
+            -volname "Schiller-Klassen-Mixer v${VERSION}" \
+            -srcfolder "dist/Schiller-Klassen-Mixer-v${VERSION}.app" \
             -ov -format UDZO \
-            "Schiller-Klassen-Mixer.dmg"
+            "Schiller-Klassen-Mixer-v${VERSION}.dmg"
 
       - name: DMG hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: Schiller-Klassen-Mixer-macOS
-          path: Schiller-Klassen-Mixer.dmg
-          retention-days: 30
+          name: Schiller-Klassen-Mixer-macOS-v${{ steps.ver.outputs.version }}
+          path: Schiller-Klassen-Mixer-v${{ steps.ver.outputs.version }}.dmg
+          retention-days: 90
 
   # ── Windows: Single-File EXE ────────────────────────────────────
   build-windows:
@@ -72,6 +84,16 @@ jobs:
       - name: Abhängigkeiten installieren
         run: pip install flask pyinstaller pillow
 
+      - name: App-Version auslesen
+        id: ver
+        shell: pwsh
+        run: |
+          $content = Get-Content app.py -Raw
+          $m = [regex]::Match($content, 'APP_VERSION\s*=\s*"([^"]+)"')
+          $v = $m.Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "App-Version: $v"
+
       - name: Icon erstellen (PNG → ICO)
         run: |
           python -c "
@@ -82,12 +104,14 @@ jobs:
           "
 
       - name: PyInstaller-Build (Onefile, alles in einer EXE)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           pyinstaller `
             --noconfirm `
             --onefile `
             --windowed `
-            --name "Schiller-Klassen-Mixer" `
+            --name "Schiller-Klassen-Mixer-v$env:VERSION" `
             --icon "static\logo.ico" `
             --add-data "static;static" `
             --add-data "app.py;." `
@@ -97,6 +121,6 @@ jobs:
       - name: EXE hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: Schiller-Klassen-Mixer-Windows
-          path: dist/Schiller-Klassen-Mixer.exe
-          retention-days: 30
+          name: Schiller-Klassen-Mixer-Windows-v${{ steps.ver.outputs.version }}
+          path: dist/Schiller-Klassen-Mixer-v${{ steps.ver.outputs.version }}.exe
+          retention-days: 90
