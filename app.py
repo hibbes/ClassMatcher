@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.4"
+APP_VERSION = "1.5"
 
 app = Flask(__name__, static_folder="static")
 
@@ -354,7 +354,7 @@ def refine_friends():
     nicht (nur Swaps). Antwort wie /api/assign.
     """
     from matcher import (
-        refine_friends_klasse8, calculate_classes, calculate_stats,
+        refine_friends_klasse8, refine_friends_klasse5, calculate_stats,
     )
 
     if not _state["students"] or not _state.get("last_assignment", {}).get("classes"):
@@ -368,23 +368,14 @@ def refine_friends():
 
         if _state["mode"] == "klasse8":
             classes = refine_friends_klasse8(
-                _state["students"],
-                current_classes,
-                _state["params"],
-                _state["resolved_wishes"],
-                _state["dont_be_with"],
+                _state["students"], current_classes, _state["params"],
+                _state["resolved_wishes"], _state["dont_be_with"],
                 locked_students=_state["locked_students"],
             )
             _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in classes}
         else:
-            # Modus 5: kein dedizierter Refiner – stattdessen Neu-Assign mit
-            # extrem hohem friend-Gewicht. Locks bleiben erhalten.
-            refine_params = dict(_state["params"])
-            refine_params["weightFriendWish"]    = 20
-            refine_params["weightGenderBalance"] = 0
-            refine_params["weightMusicSplit"]    = 0
-            classes = calculate_classes(
-                _state["students"], refine_params,
+            classes = refine_friends_klasse5(
+                _state["students"], current_classes, _state["params"],
                 _state["resolved_wishes"], _state["dont_be_with"],
                 locked_students=_state["locked_students"],
             )

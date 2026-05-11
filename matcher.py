@@ -498,6 +498,21 @@ BILI_TRACK  = "5y"   # Bili – eigene Klasse, keine Musikzug-Schüler
 FILL_TRACK  = "5z"   # Normalzug – verteilt auf alle Nicht-Bili-Klassen
 
 
+def _wish_score_classes_dict(classes: list, resolved_wishes: dict) -> int:
+    sid2cls: dict = {}
+    for c in classes:
+        for sid in c["students"]:
+            sid2cls[sid] = c["id"]
+    n = 0
+    for sid, friends in resolved_wishes.items():
+        if sid not in sid2cls:
+            continue
+        for fid in friends:
+            if sid2cls.get(fid) == sid2cls[sid]:
+                n += 1
+    return n
+
+
 def calculate_classes(
     students:        list,
     params:          dict,
@@ -505,7 +520,44 @@ def calculate_classes(
     dont_be_with:    list,
     locked_students: dict = None,
 ) -> list:
-    """Klassen berechnen.
+    """Klassen-5-Berechnung mit Multi-Start + Friend-Refinement.
+
+    Params:
+        multiStart  – Anzahl unabhängiger SA-Läufe (default 5)
+        autoRefine  – Anzahl Friend-Refinement-Pässe pro Run (default 2)
+    """
+    multi_start = max(1, int(params.get("multiStart", 5)))
+    auto_refine = max(0, int(params.get("autoRefine", 2)))
+
+    best_classes = None
+    best_score   = -1
+    for run_idx in range(multi_start):
+        if multi_start > 1:
+            random.seed(20260511 + run_idx * 9973)
+        cl = _calculate_classes_single(
+            students, params, resolved_wishes, dont_be_with, locked_students,
+        )
+        for _ in range(auto_refine):
+            cur = [{"id": c["id"], "students": list(c["students"])} for c in cl]
+            cl = refine_friends_klasse5(
+                students, cur, params, resolved_wishes, dont_be_with,
+                locked_students,
+            )
+        score = _wish_score_classes_dict(cl, resolved_wishes)
+        if score > best_score:
+            best_score   = score
+            best_classes = cl
+    return best_classes
+
+
+def _calculate_classes_single(
+    students:        list,
+    params:          dict,
+    resolved_wishes: dict,
+    dont_be_with:    list,
+    locked_students: dict = None,
+) -> list:
+    """Einzelner Lauf (Modus 5).
 
     Bili-Schüler (Profil 5y) bleiben fix in der Bili-Klasse.
     Musikzug-Schüler (Profil 5x) werden – je nach weightMusicSplit – auf
@@ -595,6 +647,163 @@ def calculate_classes(
             "track":    _track_of(cid),
             "students": fixed[cid] + z_asgn.get(cid, []),
         }
+        for cid in class_ids
+    ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Modus 5 – Friend-Refinement-Lauf
+# ──────────────────────────────────────────────────────────────────────────────
+
+def refine_friends_klasse5(
+    students:        list,
+    current_classes: list,    # [{"id": "5z-1", "students": [sid, …]}, …]
+    params:          dict,
+    resolved_wishes: dict,
+    dont_be_with:    list,
+    locked_students: dict = None,
+) -> list:
+    """SA-Refinement vom aktuellen Stand mit reiner Friend-Optimierung
+    für Modus 5 (5. Klassen).
+
+    Hard-Constraints bleiben:
+      – Bili-SuS (Profil 5y) bleiben in ihrer Bili-Klasse (werden nicht bewegt)
+      – Musikzug-SuS (Profil 5x) niemals in Bili-Klasse
+      – Latein-SuS niemals in der lateinfreien Klasse
+    Locks bleiben fix. Klassengrößen ändern sich nicht.
+    Musikzug-Spread wird beim Refinement ignoriert.
+    """
+    locked      = locked_students or {}
+    student_map = {s["id"]: s for s in students}
+
+    class_ids = [c["id"] for c in current_classes]
+    asgn      = {c["id"]: list(c["students"]) for c in current_classes}
+
+    # Rollen aus aktuellem Stand ableiten
+    bili_class       = next(
+        (cid for cid in class_ids
+         if any(student_map.get(sid, {}).get("profil") == BILI_TRACK
+                for sid in asgn[cid])),
+        None,
+    )
+    music_ids = {s["id"] for s in students if s.get("profil") == MUSIC_TRACK}
+    fill_cls_ids     = [c for c in class_ids if c != bili_class]
+    latin_free_class = fill_cls_ids[-1] if len(fill_cls_ids) >= 2 else None
+    is_latin = {s["id"]: s.get("fremdsprache2") == "L" for s in students}
+
+    # Bili-Schüler sind fix in der Bili-Klasse – nicht bewegen
+    bili_sids = {sid for cid in class_ids for sid in asgn[cid]
+                 if student_map.get(sid, {}).get("profil") == BILI_TRACK}
+    locked_ids = set(locked.keys()) | bili_sids
+
+    free_ids = {sid for cid in class_ids for sid in asgn[cid]
+                if sid not in locked_ids}
+
+    if len(class_ids) < 2 or not free_ids:
+        def _track_of(cid):
+            return cid.rsplit("-", 1)[0] if "-" in cid else cid
+        return [
+            {"id": cid, "name": cid, "track": _track_of(cid),
+             "students": asgn[cid]}
+            for cid in class_ids
+        ]
+
+    def forbidden_for(sid: str) -> set:
+        f: set = set()
+        if latin_free_class and is_latin.get(sid):
+            f.add(latin_free_class)
+        if bili_class and sid in music_ids:
+            f.add(bili_class)
+        return f
+
+    def score(z: dict) -> float:
+        sid2cls: dict = {}
+        for cid, sids in z.items():
+            for sid in sids:
+                sid2cls[sid] = cid
+        sc = 0.0
+        for sid, friends in resolved_wishes.items():
+            if sid not in sid2cls:
+                continue
+            for fid in friends:
+                if sid2cls.get(fid) == sid2cls[sid]:
+                    sc += 1.0
+        for pair in dont_be_with:
+            a, b = pair.get("a"), pair.get("b")
+            if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
+                sc -= 1_000_000
+        return sc
+
+    cur_score  = score(asgn)
+    best_asgn  = {k: list(v) for k, v in asgn.items()}
+    best_score = cur_score
+
+    iterations = max(8_000, len(free_ids) * 120)
+    T          = 4.0
+    T_min      = 0.02
+    cool       = (T_min / T) ** (1.0 / iterations)
+    n_cls      = len(class_ids)
+
+    for _ in range(iterations):
+        use_rotate = (n_cls >= 3 and random.random() < 0.30)
+
+        if use_rotate:
+            c1, c2, c3 = random.sample(class_ids, 3)
+            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            p3 = [i for i, sid in enumerate(asgn[c3]) if sid in free_ids]
+            if not (p1 and p2 and p3):
+                T = max(T_min, T * cool)
+                continue
+            i1, i2, i3 = random.choice(p1), random.choice(p2), random.choice(p3)
+            sid1, sid2, sid3 = asgn[c1][i1], asgn[c2][i2], asgn[c3][i3]
+            if (c2 in forbidden_for(sid1)
+                or c3 in forbidden_for(sid2)
+                or c1 in forbidden_for(sid3)):
+                T = max(T_min, T * cool)
+                continue
+            asgn[c1][i1] = sid3
+            asgn[c2][i2] = sid1
+            asgn[c3][i3] = sid2
+            new_score = score(asgn)
+            delta     = new_score - cur_score
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in asgn.items()}
+            else:
+                asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
+        else:
+            c1, c2 = random.sample(class_ids, 2)
+            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
+            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            if not p1 or not p2:
+                T = max(T_min, T * cool)
+                continue
+            i1, i2 = random.choice(p1), random.choice(p2)
+            sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
+            if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+                T = max(T_min, T * cool)
+                continue
+            asgn[c1][i1], asgn[c2][i2] = sid2, sid1
+            new_score = score(asgn)
+            delta     = new_score - cur_score
+            if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
+                cur_score = new_score
+                if cur_score > best_score:
+                    best_score = cur_score
+                    best_asgn  = {k: list(v) for k, v in asgn.items()}
+            else:
+                asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+
+        T = max(T_min, T * cool)
+
+    def _track_of(cid):
+        return cid.rsplit("-", 1)[0] if "-" in cid else cid
+    return [
+        {"id": cid, "name": cid, "track": _track_of(cid),
+         "students": best_asgn[cid]}
         for cid in class_ids
     ]
 
