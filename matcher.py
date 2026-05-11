@@ -1191,10 +1191,59 @@ def optimize_klasse8_assignment(
     place(music_grp,   [musik_class] if musik_class else class_ids)
     place(bili_lat,    bili_classes  if bili_classes  else (latein_classes or class_ids))
     place(bili_only,   bili_classes  if bili_classes  else class_ids)
-    place(latein_only, latein_classes if latein_classes else class_ids)
-    # Rest darf in alle Klassen – das _place sortiert nach freier Kapazität,
-    # also wird die freie Klasse (kein Bili/Musik) zuerst gefüllt.
-    place(rest,        class_ids)
+
+    # Friend-Cluster-First-Init: vor dem "kleinste Klasse zuerst"-Pre-Place
+    # versucht jeder Schüler in die Klasse seines bereits platzierten
+    # Wunsch-Freundes zu kommen – aber nur, wenn die Klasse nicht schon
+    # überfüllt ist (sonst kippt die Größen-Balance).
+    target_size = (len(students) / len(class_ids)) if class_ids else 0
+    tolerance   = max(1.0, target_size * 0.15)
+
+    def place_friend_aware(slist, allowed):
+        if not slist or not allowed:
+            return
+        priority = {c: i for i, c in enumerate(allowed)}
+        placed_map = {sid: cid for cid in class_ids for sid in asgn[cid]}
+        def affinity(stud):
+            return sum(1 for fid in resolved_wishes.get(stud["id"], [])
+                       if fid in placed_map)
+        slist_sorted = sorted(slist, key=lambda s: -affinity(s))
+        for stud in slist_sorted:
+            sid = stud["id"]
+            elig = [c for c in allowed if rem_cap.get(c, 0) > 0]
+            if not elig:
+                break
+            wishes = resolved_wishes.get(sid, [])
+            friend_cls = Counter()
+            for fid in wishes:
+                cid = placed_map.get(fid)
+                if cid in elig:
+                    friend_cls[cid] += 1
+            for other_sid, other_friends in resolved_wishes.items():
+                if sid in other_friends and other_sid in placed_map:
+                    cid = placed_map[other_sid]
+                    if cid in elig:
+                        friend_cls[cid] += 1
+
+            def effective_friends(c):
+                # Friend-Bonus deaktiviert, wenn Klasse über target+tolerance:
+                # so wachsen Bili/Latein-Klassen nicht ungebremst.
+                if len(asgn[c]) >= target_size + tolerance:
+                    return 0
+                return friend_cls.get(c, 0)
+
+            elig.sort(key=lambda c: (
+                -effective_friends(c),
+                len(asgn[c]),
+                priority[c],
+            ))
+            cid = elig[0]
+            asgn[cid].append(sid)
+            rem_cap[cid] -= 1
+            placed_map[sid] = cid
+
+    place_friend_aware(latein_only, latein_classes if latein_classes else class_ids)
+    place_friend_aware(rest,        class_ids)
 
     def score(z):
         return score_klasse8(
@@ -1400,26 +1449,34 @@ def _calculate_classes_klasse8_single(
     rest_count   = n - bili_count - musik_count   # untere Schranke für rest
 
     def fits(nc):
+        # Hard: Gesamtkapazität muss reichen
         if nc * max_size < n:
-            return False
-        if min_size and nc > 1 and n / nc < min_size and nc - 1 >= 1 \
-           and math.ceil(n / (nc - 1)) <= max_size:
             return False
         n_bili_cls  = min(max_bili_classes, nc) if bili_count else 0
         n_musik_cls = 1 if musik_count else 0
         normal_cls  = nc - n_bili_cls - n_musik_cls
         if normal_cls < 0:
             return False
-        if normal_cls > 0 and rest_count / normal_cls > max_size:
-            return False
+        # Kein Pessimismus mit rest-Verteilung – rest kann auch in
+        # Bili/Musik-Klassen platziert werden, solange Cap reicht.
         return True
 
     if force_num_cls:
         num_classes = max(1, int(force_num_cls))
     else:
         num_classes = max(1, math.ceil(n / max_size))
-        while not fits(num_classes) and num_classes < n:
+        # Obere Schranke aus min_size: bei n=114, min=22 → höchstens
+        # 5 Klassen, sonst sind die Klassen zu klein.
+        upper = max(num_classes,
+                    math.floor(n / min_size) if min_size and min_size > 0 else n)
+        while not fits(num_classes) and num_classes < upper:
             num_classes += 1
+        # Wenn am Ende immer noch nicht fits: die min_size-Vorgabe ist mit
+        # der Datenlage nicht erfüllbar (z.B. zu viele Bili-SuS bei max=25).
+        # Wir nehmen die kleinste Klassenanzahl, die Gesamtkapazität schafft –
+        # User sieht die Konsequenz und kann max_size hochschrauben.
+        if not fits(num_classes):
+            num_classes = max(1, math.ceil(n / max_size))
 
     class_ids = [f"8{chr(ord('a') + i)}" for i in range(num_classes)]
 

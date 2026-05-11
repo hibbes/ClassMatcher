@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.5.2"
 
 app = Flask(__name__, static_folder="static")
 
@@ -380,19 +380,20 @@ def refine_friends():
             for c in _state["last_assignment"]["classes"]
         ]
 
-        if _state["mode"] == "klasse8":
-            classes = refine_friends_klasse8(
-                _state["students"], current_classes, _state["params"],
+        # 3 Refinement-Pässe hintereinander – meist konvergiert es nach 1-2.
+        refiner = refine_friends_klasse8 if _state["mode"] == "klasse8" else refine_friends_klasse5
+        classes = current_classes
+        for _ in range(3):
+            classes = refiner(
+                _state["students"],
+                [{"id": c["id"], "students": list(c["students"])} for c in classes],
+                _state["params"],
                 _state["resolved_wishes"], _state["dont_be_with"],
                 locked_students=_state["locked_students"],
             )
+        if _state["mode"] == "klasse8":
             _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in classes}
         else:
-            classes = refine_friends_klasse5(
-                _state["students"], current_classes, _state["params"],
-                _state["resolved_wishes"], _state["dont_be_with"],
-                locked_students=_state["locked_students"],
-            )
             _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
 
         for cls in classes:
