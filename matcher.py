@@ -1113,6 +1113,20 @@ def optimize_klasse8_assignment(
     free       = [s for s in students if s["id"] not in locked_ids]
     free_ids   = {s["id"] for s in free}
 
+    # Hard-Constraint „dont be with": Lookup-Tabelle
+    dont_partner: dict = defaultdict(set)
+    for pair in dont_be_with:
+        a, b = pair.get("a"), pair.get("b")
+        if a and b:
+            dont_partner[a].add(b)
+            dont_partner[b].add(a)
+
+    def has_dont_conflict(cid: str, sid: str) -> bool:
+        partners = dont_partner.get(sid)
+        if not partners:
+            return False
+        return any(p in asgn[cid] for p in partners)
+
     def forbidden_for(sid: str) -> set:
         f: set = set()
         is_bili   = sid in bili_ids
@@ -1175,18 +1189,31 @@ def optimize_klasse8_assignment(
 
     def place(slist, allowed):
         """Verteile slist so, dass aktuell kleinste erlaubte Klasse zuerst
-        wächst – Ziel: gleichmäßige Klassengrößen."""
+        wächst – Ziel: gleichmäßige Klassengrößen.
+        Vermeidet dont-be-with-Partner in derselben Klasse. Bei Cap-
+        Erschöpfung wird in die kleinste erlaubte Klasse überlaufen,
+        statt SuS zu droppen."""
         if not slist or not allowed:
             return
-        priority = {c: i for i, c in enumerate(allowed)}   # stabile Tiebreaker
+        priority = {c: i for i, c in enumerate(allowed)}
         for stud in slist:
+            sid = stud["id"]
             elig = [c for c in allowed if rem_cap.get(c, 0) > 0]
-            if not elig:
-                break
-            elig.sort(key=lambda c: (len(asgn[c]), priority[c]))
-            cid = elig[0]
-            asgn[cid].append(stud["id"])
-            rem_cap[cid] -= 1
+            if elig:
+                safe = [c for c in elig if not has_dont_conflict(c, sid)]
+                if safe:
+                    elig = safe
+                elig.sort(key=lambda c: (len(asgn[c]), priority[c]))
+                cid = elig[0]
+            else:
+                # Cap erschöpft – Overflow in die kleinste erlaubte Klasse,
+                # nach Möglichkeit ohne dont-Konflikt.
+                safe = [c for c in allowed if not has_dont_conflict(c, sid)]
+                pool = safe if safe else list(allowed)
+                pool.sort(key=lambda c: (len(asgn[c]), priority[c]))
+                cid = pool[0]
+            asgn[cid].append(sid)
+            rem_cap[cid] = rem_cap.get(cid, 0) - 1
 
     place(music_grp,   [musik_class] if musik_class else class_ids)
     place(bili_lat,    bili_classes  if bili_classes  else (latein_classes or class_ids))
@@ -1210,9 +1237,13 @@ def optimize_klasse8_assignment(
         slist_sorted = sorted(slist, key=lambda s: -affinity(s))
         for stud in slist_sorted:
             sid = stud["id"]
-            elig = [c for c in allowed if rem_cap.get(c, 0) > 0]
-            if not elig:
-                break
+            elig_raw = [c for c in allowed if rem_cap.get(c, 0) > 0]
+            elig = elig_raw or list(allowed)   # Cap-Overflow erlaubt
+            # dont-Konflikt-Filter
+            safe = [c for c in elig if not has_dont_conflict(c, sid)]
+            if safe:
+                elig = safe
+
             wishes = resolved_wishes.get(sid, [])
             friend_cls = Counter()
             for fid in wishes:
@@ -1226,8 +1257,6 @@ def optimize_klasse8_assignment(
                         friend_cls[cid] += 1
 
             def effective_friends(c):
-                # Friend-Bonus deaktiviert, wenn Klasse über target+tolerance:
-                # so wachsen Bili/Latein-Klassen nicht ungebremst.
                 if len(asgn[c]) >= target_size + tolerance:
                     return 0
                 return friend_cls.get(c, 0)
@@ -1239,7 +1268,7 @@ def optimize_klasse8_assignment(
             ))
             cid = elig[0]
             asgn[cid].append(sid)
-            rem_cap[cid] -= 1
+            rem_cap[cid] = rem_cap.get(cid, 0) - 1
             placed_map[sid] = cid
 
     place_friend_aware(latein_only, latein_classes if latein_classes else class_ids)
@@ -1269,6 +1298,41 @@ def optimize_klasse8_assignment(
 
     n_cls = len(class_ids)
 
+    def dont_conflict_after_swap(c1, c2, sid1, sid2):
+        """sid1 wandert nach c2, sid2 nach c1 – Konflikt?"""
+        p1 = dont_partner.get(sid1)
+        p2 = dont_partner.get(sid2)
+        if p1:
+            for o in asgn[c2]:
+                if o == sid2:
+                    continue
+                if o in p1:
+                    return True
+        if p2:
+            for o in asgn[c1]:
+                if o == sid1:
+                    continue
+                if o in p2:
+                    return True
+        return False
+
+    def dont_conflict_after_rotate(c1, c2, c3, sid1, sid2, sid3):
+        """sid1→c2, sid2→c3, sid3→c1"""
+        for src_c, src_sid, new_sid in (
+            (c2, sid2, sid1),  # in c2 ersetzt sid2 durch sid1
+            (c3, sid3, sid2),
+            (c1, sid1, sid3),
+        ):
+            partners = dont_partner.get(new_sid)
+            if not partners:
+                continue
+            for o in asgn[src_c]:
+                if o == src_sid:
+                    continue
+                if o in partners:
+                    return True
+        return False
+
     for _ in range(iterations):
         use_rotate = (n_cls >= 3 and random.random() < 0.25)
 
@@ -1286,6 +1350,9 @@ def optimize_klasse8_assignment(
             if (c2 in forbidden_for(sid1)
                 or c3 in forbidden_for(sid2)
                 or c1 in forbidden_for(sid3)):
+                T = max(T_min, T * cool)
+                continue
+            if dont_conflict_after_rotate(c1, c2, c3, sid1, sid2, sid3):
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1] = sid3
@@ -1312,6 +1379,9 @@ def optimize_klasse8_assignment(
             sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
 
             if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+                T = max(T_min, T * cool)
+                continue
+            if dont_conflict_after_swap(c1, c2, sid1, sid2):
                 T = max(T_min, T * cool)
                 continue
 
@@ -1632,6 +1702,45 @@ def refine_friends_klasse8(
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
+    # Hard-Constraint: dont-be-with
+    dont_partner: dict = defaultdict(set)
+    for pair in dont_be_with:
+        a, b = pair.get("a"), pair.get("b")
+        if a and b:
+            dont_partner[a].add(b)
+            dont_partner[b].add(a)
+
+    def dont_conflict_after_swap(c1, c2, sid1, sid2):
+        p1 = dont_partner.get(sid1)
+        p2 = dont_partner.get(sid2)
+        if p1:
+            for o in asgn[c2]:
+                if o == sid2:
+                    continue
+                if o in p1:
+                    return True
+        if p2:
+            for o in asgn[c1]:
+                if o == sid1:
+                    continue
+                if o in p2:
+                    return True
+        return False
+
+    def dont_conflict_after_rotate(c1, c2, c3, sid1, sid2, sid3):
+        for src_c, src_sid, new_sid in (
+            (c2, sid2, sid1), (c3, sid3, sid2), (c1, sid1, sid3),
+        ):
+            partners = dont_partner.get(new_sid)
+            if not partners:
+                continue
+            for o in asgn[src_c]:
+                if o == src_sid:
+                    continue
+                if o in partners:
+                    return True
+        return False
+
     iterations = max(8_000, len(free_ids) * 120)
     T          = 4.0
     T_min      = 0.02
@@ -1653,6 +1762,9 @@ def refine_friends_klasse8(
             if (c2 in forbidden_for(sid1)
                 or c3 in forbidden_for(sid2)
                 or c1 in forbidden_for(sid3)):
+                T = max(T_min, T * cool)
+                continue
+            if dont_conflict_after_rotate(c1, c2, c3, sid1, sid2, sid3):
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1] = sid3
@@ -1677,6 +1789,9 @@ def refine_friends_klasse8(
             i1, i2 = random.choice(p1), random.choice(p2)
             sid1, sid2 = asgn[c1][i1], asgn[c2][i2]
             if c2 in forbidden_for(sid1) or c1 in forbidden_for(sid2):
+                T = max(T_min, T * cool)
+                continue
+            if dont_conflict_after_swap(c1, c2, sid1, sid2):
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
