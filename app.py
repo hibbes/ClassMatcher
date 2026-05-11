@@ -6,9 +6,23 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5"
+APP_VERSION = "1.5.1"
 
 app = Flask(__name__, static_folder="static")
+
+
+# Verhindert, dass Browser HTML/JS/CSS cachen – bei lokalem Tool gewinnen
+# wir damit, dass nach Update der EXE die alten Dateien nicht aus dem
+# Browser-Cache geladen werden.
+@app.after_request
+def _no_cache(response):
+    if request.path.startswith("/api/") or request.endpoint in (
+        "index", "static_files",
+    ):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"]        = "no-cache"
+        response.headers["Expires"]       = "0"
+    return response
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Anwendungs-Zustand (In-Memory)
