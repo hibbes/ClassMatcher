@@ -117,6 +117,18 @@ const api = {
     const r = await fetch("/api/refine-friends", { method: "POST" });
     return r.json();
   },
+  async checkUpdate() {
+    const r = await fetch("/api/check-update");
+    return r.json();
+  },
+  async downloadUpdate(downloadUrl) {
+    const r = await fetch("/api/download-update", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ download_url: downloadUrl }),
+    });
+    return r.json();
+  },
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -952,6 +964,60 @@ function updateSubtitle(text) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Auto-Update-Banner
+// ──────────────────────────────────────────────────────────────────
+
+async function checkForUpdate() {
+  let info;
+  try {
+    info = await api.checkUpdate();
+  } catch {
+    return;  // Netzfehler o.ä. – stillschweigend, kein Banner
+  }
+  if (!info || !info.update_available) return;
+
+  const banner  = document.getElementById("update-banner");
+  const textEl  = document.getElementById("update-banner-text");
+  const actions = document.getElementById("update-banner-actions");
+
+  textEl.textContent =
+    `🔔 Version ${info.latest} verfügbar (Sie haben ${info.current}).`;
+  if (info.notes) textEl.textContent += ` ${info.notes}`;
+
+  const btn = document.createElement("button");
+  btn.className = "btn btn-primary btn-sm";
+  btn.textContent = "Jetzt herunterladen";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Lädt …";
+    let res;
+    try {
+      res = await api.downloadUpdate(info.download_url);
+    } catch {
+      res = { ok: false, fallback_url: info.download_url };
+    }
+    actions.innerHTML = "";
+    if (res.ok) {
+      textEl.textContent =
+        `✓ Heruntergeladen: ${res.path} — alte App schließen, neue Datei starten.`;
+    } else {
+      textEl.textContent = "Automatischer Download ging nicht (Proxy?). ";
+      const link = document.createElement("a");
+      link.href = res.fallback_url;
+      link.textContent = "Hier direkt herunterladen";
+      link.setAttribute("download", "");
+      actions.appendChild(link);
+    }
+  });
+  actions.appendChild(btn);
+
+  document.getElementById("update-banner-close")
+    .addEventListener("click", () => banner.classList.add("hidden"));
+
+  banner.classList.remove("hidden");
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Initialisierung
 // ──────────────────────────────────────────────────────────────────
 
@@ -967,6 +1033,9 @@ async function init() {
       if (el && d.version) el.textContent = "v" + d.version;
     })
     .catch(() => {});
+
+  // Auto-Update-Check (nicht-blockierend, scheitert still)
+  checkForUpdate();
 
   // ── Mode-Toggle ───────────────────────────────────────────
   document.getElementById("mode-klasse5").addEventListener("click", () => {

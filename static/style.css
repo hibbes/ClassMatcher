@@ -992,3 +992,24 @@ html, body {
   .print-dot.w { background: #db2777; }
   .print-dot.x { background: #94a3b8; }
 }
+
+/* ── Update-Banner ──────────────────────────────────────────────── */
+#update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--warning);
+  color: #fff;
+  font-size: 13px;
+}
+#update-banner-text { flex: 1; }
+#update-banner a { color: #fff; font-weight: 600; }
+#update-banner-close {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
