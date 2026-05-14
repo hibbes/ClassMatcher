@@ -92,6 +92,29 @@ def index():
 def version():
     return jsonify({"version": APP_VERSION})
 
+
+@app.route("/api/check-update")
+def check_update():
+    """Prüft die Schul-Homepage auf eine neuere Version.
+    Aus dem Quellcode gestartet (nicht-frozen) → immer 'kein Update'."""
+    import sys
+    if not getattr(sys, "frozen", False):
+        return jsonify({"update_available": False, "current": APP_VERSION,
+                        "latest": None, "download_url": None, "notes": None})
+    import update
+    return jsonify(update.check_for_update(APP_VERSION))
+
+
+@app.route("/api/download-update", methods=["POST"])
+def download_update_route():
+    """Lädt das neue Binary nach ~/Downloads/ (Fallback: Browser-Link)."""
+    import update
+    url = (request.json or {}).get("download_url")
+    if not url:
+        return jsonify({"ok": False, "error": "download_url fehlt"}), 400
+    return jsonify(update.download_update(url))
+
+
 @app.route("/<path:filename>")
 def static_files(filename):
     return send_from_directory("static", filename)
