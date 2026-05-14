@@ -83,6 +83,15 @@ Erwartete Spalten (UTF-8, `;` oder `,` getrennt):
 
 Die Beispieldatei `Anmeldungen.csv` im Repo zeigt das erwartete Format (anonymisiert/synthetisch).
 
+## Auto-Update
+
+Beim Start prüft die App einmalig, ob auf `https://schiller-offenburg.de/classmatcher/`
+eine neuere Version liegt. Falls ja, erscheint oben ein Banner mit Download-Knopf;
+die neue Datei landet in `~/Downloads/`, der Datei-Tausch bleibt manuell. Der Check
+ist gnädig (offline/Proxy → kein Banner, nie ein Fehler) und lässt sich über
+`~/.classmatcher.cfg` mit `update_check=off` abschalten; ein expliziter Proxy geht
+dort via `proxy=http://host:port`.
+
 ## Datenschutz
 
 Personen­bezogene Daten (Namen, Geburtstage, Wünsche) werden **ausschließlich im Arbeitsspeicher** des lokal laufenden Servers gehalten. Es gibt keine persistente Speicherung, keine Cloud-Anbindung, keine Analytics. Beim Beenden der Anwendung sind alle Daten weg – explizit so entworfen, damit die DSGVO-Anforderungen einer schulischen Anwendung leicht einzuhalten sind.
