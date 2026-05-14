@@ -1,0 +1,77 @@
+Nachname;Vorname;Klasse/Information;Ich bin ...;Ich bin im Bili - Zug;Ich habe Latein als Zweitsprache;Ich habe vor, das Schiller nach der 7. Klasse zu verlassen.;Ich wähle folgendes Profil ab der 8. Klasse.;Ich möchte bitte mit folgenden Freunden in eine Klasse kommen.;Ich hätte IMP gewählt.
+Test00;Person00;7a;männlich;Ja;Ja;Nein;Naturwissenschaft und Technik (NWT);Person01 Test01, Person03 Test03;Ja
+Test01;Person01;7b;weiblich;Nein;Nein;Nein;Spanisch;Person02 Test02, Person10 Test10;Nein
+Test02;Person02;7c;männlich;Nein;Nein;Nein;IMP;;Nein
+Test03;Person03;7d;weiblich;Ja;Nein;Nein;Musik;Person04 Test04, Person24 Test24;Nein
+Test04;Person04;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person05 Test05, Person31 Test31;Nein
+Test05;Person05;7b;weiblich;Nein;Ja;Nein;Spanisch;Person06 Test06, Person38 Test38;Nein
+Test06;Person06;7c;männlich;Ja;Nein;Nein;IMP;Person07 Test07, Person45 Test45;Nein
+Test07;Person07;7d;weiblich;Nein;Nein;Nein;;Person08 Test08, Person52 Test52;Nein
+Test08;Person08;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person09 Test09, Person59 Test59;Ja
+Test09;Person09;7b;weiblich;Nein;Nein;Nein;Spanisch;Person10 Test10, Person66 Test66;Nein
+Test10;Person10;7c;männlich;Nein;Ja;Nein;IMP;Person11 Test11, Person73 Test73;Nein
+Test11;Person11;7d;weiblich;Nein;Nein;Nein;Musik;Person12 Test12, Person04 Test04;Nein
+Test12;Person12;7a;männlich;Ja;Nein;Nein;Naturwissenschaft und Technik (NWT);Person13 Test13, Person11 Test11;Nein
+Test13;Person13;7b;weiblich;Nein;Nein;Ja;Spanisch;Person14 Test14, Person18 Test18;Nein
+Test14;Person14;7c;männlich;Nein;Nein;Nein;IMP;Person15 Test15, Person25 Test25;Nein
+Test15;Person15;7d;weiblich;Nein;Ja;Nein;Musik;Person16 Test16, Person32 Test32;Nein
+Test16;Person16;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person17 Test17, Person39 Test39;Ja
+Test17;Person17;7b;weiblich;Nein;Nein;Nein;Spanisch;Person18 Test18, Person46 Test46;Nein
+Test18;Person18;7c;männlich;Ja;Nein;Nein;IMP;Person19 Test19, Person53 Test53;Nein
+Test19;Person19;7d;weiblich;Nein;Nein;Nein;Musik;;Nein
+Test20;Person20;7a;männlich;Nein;Ja;Nein;Naturwissenschaft und Technik (NWT);Person21 Test21, Person67 Test67;Nein
+Test21;Person21;7b;weiblich;Nein;Nein;Nein;Spanisch;Person22 Test22, Person74 Test74;Nein
+Test22;Person22;7c;männlich;Nein;Nein;Nein;IMP;Person23 Test23, Person05 Test05;Nein
+Test23;Person23;7d;weiblich;Nein;Nein;Nein;Musik;Person24 Test24, Person12 Test12;Nein
+Test24;Person24;7a;männlich;Ja;Nein;Nein;Naturwissenschaft und Technik (NWT);Person25 Test25, Person19 Test19;Ja
+Test25;Person25;7b;weiblich;Nein;Ja;Nein;Spanisch;Person26 Test26, Person26 Test26;Nein
+Test26;Person26;7c;männlich;Nein;Nein;Nein;IMP;Person27 Test27, Person33 Test33;Nein
+Test27;Person27;7d;weiblich;Ja;Nein;Nein;Musik;Person28 Test28, Person40 Test40;Nein
+Test28;Person28;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person29 Test29, Person47 Test47;Nein
+Test29;Person29;7b;weiblich;Nein;Nein;Nein;Spanisch;Person30 Test30, Person54 Test54;Nein
+Test30;Person30;7c;männlich;Ja;Ja;Nein;IMP;Person31 Test31, Person61 Test61;Nein
+Test31;Person31;7d;weiblich;Nein;Nein;Nein;Musik;Person32 Test32, Person68 Test68;Nein
+Test32;Person32;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person33 Test33, Person75 Test75;Ja
+Test33;Person33;7b;weiblich;Nein;Nein;Nein;Spanisch;Person34 Test34, Person06 Test06;Nein
+Test34;Person34;7c;männlich;Nein;Nein;Nein;IMP;Person35 Test35, Person13 Test13;Nein
+Test35;Person35;7d;weiblich;Nein;Ja;Nein;Musik;Person36 Test36, Person20 Test20;Nein
+Test36;Person36;7a;männlich;Ja;Nein;Nein;Naturwissenschaft und Technik (NWT);Person37 Test37, Person27 Test27;Nein
+Test37;Person37;7b;weiblich;Nein;Nein;Nein;Spanisch;Person38 Test38, Person34 Test34;Nein
+Test38;Person38;7c;männlich;Nein;Nein;Nein;IMP;Person39 Test39, Person41 Test41;Nein
+Test39;Person39;7d;weiblich;Nein;Nein;Nein;Musik;Person40 Test40, Person48 Test48;Nein
+Test40;Person40;7a;männlich;Nein;Ja;Nein;Naturwissenschaft und Technik (NWT);Person41 Test41, Person55 Test55;Ja
+Test41;Person41;7b;weiblich;Nein;Nein;Ja;Spanisch;Person42 Test42, Person62 Test62;Nein
+Test42;Person42;7c;männlich;Ja;Nein;Nein;IMP;Person43 Test43, Person69 Test69;Nein
+Test43;Person43;7d;weiblich;Nein;Nein;Nein;Musik;Person44 Test44, Person00 Test00;Nein
+Test44;Person44;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);;Nein
+Test45;Person45;7b;weiblich;Nein;Ja;Nein;Spanisch;Person46 Test46, Person14 Test14;Nein
+Test46;Person46;7c;männlich;Nein;Nein;Nein;IMP;Person47 Test47, Person21 Test21;Nein
+Test47;Person47;7d;weiblich;Nein;Nein;Nein;Musik;Person48 Test48, Person28 Test28;Nein
+Test48;Person48;7a;männlich;Ja;Nein;Nein;Naturwissenschaft und Technik (NWT);Person49 Test49, Person35 Test35;Ja
+Test49;Person49;7b;weiblich;Nein;Nein;Nein;Spanisch;Person50 Test50, Person42 Test42;Nein
+Test50;Person50;7c;männlich;Nein;Ja;Nein;;Person51 Test51, Person49 Test49;Nein
+Test51;Person51;7d;weiblich;Ja;Nein;Nein;Musik;Person52 Test52, Person56 Test56;Nein
+Test52;Person52;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person53 Test53, Person63 Test63;Nein
+Test53;Person53;7b;weiblich;Nein;Nein;Nein;Spanisch;Person54 Test54, Person70 Test70;Nein
+Test54;Person54;7c;männlich;Ja;Nein;Nein;IMP;Person55 Test55, Person01 Test01;Nein
+Test55;Person55;7d;weiblich;Nein;Ja;Nein;Musik;Person56 Test56, Person08 Test08;Nein
+Test56;Person56;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person57 Test57, Person15 Test15;Ja
+Test57;Person57;7b;weiblich;Nein;Nein;Nein;Spanisch;Person58 Test58, Person22 Test22;Nein
+Test58;Person58;7c;männlich;Nein;Nein;Nein;IMP;Person59 Test59, Person29 Test29;Nein
+Test59;Person59;7d;weiblich;Nein;Nein;Nein;Musik;Person60 Test60, Person36 Test36;Nein
+Test60;Person60;7a;männlich;Ja;Ja;Nein;Naturwissenschaft und Technik (NWT);Person61 Test61, Person43 Test43;Nein
+Test61;Person61;7b;weiblich;Nein;Nein;Nein;Spanisch;Person62 Test62, Person50 Test50;Nein
+Test62;Person62;7c;männlich;Nein;Nein;Nein;IMP;Person63 Test63, Person57 Test57;Nein
+Test63;Person63;7d;weiblich;Nein;Nein;Nein;Musik;Person64 Test64, Person64 Test64;Nein
+Test64;Person64;7a;männlich;Nein;Nein;Nein;Naturwissenschaft und Technik (NWT);Person65 Test65, Person71 Test71;Ja
+Test65;Person65;7b;weiblich;Nein;Ja;Nein;Spanisch;Person66 Test66, Person02 Test02;Nein
+Test66;Person66;7c;männlich;Ja;Nein;Nein;IMP;Person67 Test67, Person09 Test09;Nein
+Test67;Person67;7d;weiblich;Nein;Nein;Nein;Musik;Person68 Test68, Person16 Test16;Nein
+Test68;Person68;7a;männlich;Nein;Nein;Ja;Naturwissenschaft und Technik (NWT);Person69 Test69, Person23 Test23;Nein
+Test69;Person69;7b;weiblich;Nein;Nein;Nein;Spanisch;Person70 Test70, Person30 Test30;Nein
+Test70;Person70;7c;männlich;Nein;Ja;Nein;IMP;Person71 Test71, Person37 Test37;Nein
+Test71;Person71;7d;weiblich;Nein;Nein;Nein;Musik;Person72 Test72, Person44 Test44;Nein
+Test72;Person72;7a;männlich;Ja;Nein;Nein;Naturwissenschaft und Technik (NWT);Person73 Test73, Person51 Test51;Ja
+Test73;Person73;7b;weiblich;Nein;Nein;Nein;Spanisch;Person74 Test74, Person58 Test58;Nein
+Test74;Person74;7c;männlich;Nein;Nein;Nein;IMP;Person75 Test75, Person65 Test65;Nein
+Test75;Person75;7d;weiblich;Nein;Ja;Nein;Musik;Person00 Test00, Person72 Test72;Nein
