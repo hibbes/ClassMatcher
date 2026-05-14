@@ -328,12 +328,18 @@ def optimize_mixed_assignment(
     # Latein-Status für schnellen Lookup
     is_latin = {s["id"]: s.get("fremdsprache2") == "L" for s in fill_students}
 
+    _forbidden_cache: dict = {}
+
     def forbidden_for(sid: str) -> set:
+        cached = _forbidden_cache.get(sid)
+        if cached is not None:
+            return cached
         f = set()
         if latin_free_class and is_latin.get(sid):
             f.add(latin_free_class)
         if bili_class and sid in music_ids:
             f.add(bili_class)
+        _forbidden_cache[sid] = f
         return f
 
     # ── Startbelegung ────────────────────────────────────────────
@@ -708,12 +714,18 @@ def refine_friends_klasse5(
             for cid in class_ids
         ]
 
+    _forbidden_cache: dict = {}
+
     def forbidden_for(sid: str) -> set:
+        cached = _forbidden_cache.get(sid)
+        if cached is not None:
+            return cached
         f: set = set()
         if latin_free_class and is_latin.get(sid):
             f.add(latin_free_class)
         if bili_class and sid in music_ids:
             f.add(bili_class)
+        _forbidden_cache[sid] = f
         return f
 
     def score(z: dict) -> float:
@@ -1125,7 +1137,12 @@ def optimize_klasse8_assignment(
             return False
         return any(p in asgn[cid] for p in partners)
 
+    _forbidden_cache: dict = {}
+
     def forbidden_for(sid: str) -> set:
+        cached = _forbidden_cache.get(sid)
+        if cached is not None:
+            return cached
         f: set = set()
         is_bili   = sid in bili_ids
         is_musik  = sid in musik_ids
@@ -1149,6 +1166,7 @@ def optimize_klasse8_assignment(
                 for c in class_ids:
                     if c not in latein_classes:
                         f.add(c)
+        _forbidden_cache[sid] = f
         return f
 
     # ── Startbelegung ────────────────────────────────────────────
@@ -1224,6 +1242,13 @@ def optimize_klasse8_assignment(
     target_size = (len(students) / len(class_ids)) if class_ids else 0
     tolerance   = max(1.0, target_size * 0.15)
 
+    # Reverse-Wish-Map einmal vorberechnen: wer wuenscht sich fid?
+    # Ersetzt den O(n)-Scan ueber resolved_wishes pro Schueler unten.
+    who_wishes_for: dict = defaultdict(list)
+    for _w_sid, _w_friends in resolved_wishes.items():
+        for _w_fid in _w_friends:
+            who_wishes_for[_w_fid].append(_w_sid)
+
     def place_friend_aware(slist, allowed):
         if not slist or not allowed:
             return
@@ -1248,8 +1273,8 @@ def optimize_klasse8_assignment(
                 cid = placed_map.get(fid)
                 if cid in elig:
                     friend_cls[cid] += 1
-            for other_sid, other_friends in resolved_wishes.items():
-                if sid in other_friends and other_sid in placed_map:
+            for other_sid in who_wishes_for.get(sid, ()):
+                if other_sid in placed_map:
                     cid = placed_map[other_sid]
                     if cid in elig:
                         friend_cls[cid] += 1
@@ -1642,7 +1667,12 @@ def refine_friends_klasse8(
             for cid in class_ids
         ]
 
+    _forbidden_cache: dict = {}
+
     def forbidden_for(sid: str) -> set:
+        cached = _forbidden_cache.get(sid)
+        if cached is not None:
+            return cached
         f: set = set()
         is_bili   = sid in bili_ids
         is_musik  = sid in musik_ids
@@ -1661,6 +1691,7 @@ def refine_friends_klasse8(
                 for c in class_ids:
                     if c not in latein_classes:
                         f.add(c)
+        _forbidden_cache[sid] = f
         return f
 
     def score(z: dict) -> float:
