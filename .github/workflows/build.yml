@@ -124,3 +124,52 @@ jobs:
           name: Schiller-Klassen-Mixer-Windows-v${{ steps.ver.outputs.version }}
           path: dist/Schiller-Klassen-Mixer-v${{ steps.ver.outputs.version }}.exe
           retention-days: 90
+
+  # ── Publish: version.json + Binaries auf die Schul-Homepage (nur bei Tag) ──
+  publish:
+    needs: [build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Version aus Tag ableiten
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Artefakte herunterladen
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: version.json erzeugen
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          cat > version.json <<EOF
+          {
+            "version": "${VERSION}",
+            "win_url": "https://schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.exe",
+            "mac_url": "https://schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.dmg",
+            "notes": ""
+          }
+          EOF
+          cat version.json
+
+      - name: Upload zur Homepage (Binaries zuerst, version.json zuletzt)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          EXE=$(find artifacts -name '*.exe' | head -1)
+          DMG=$(find artifacts -name '*.dmg' | head -1)
+          if [ -z "$EXE" ] || [ -z "$DMG" ]; then
+            echo "::error::EXE oder DMG nicht in den Artefakten gefunden"; exit 1
+          fi
+          for f in "$EXE" "$DMG" version.json; do
+            echo "Lade hoch: $f"
+            curl --fail --silent --show-error --ftp-create-dirs \
+                 --user "$FTP_USER:$FTP_PASS" \
+                 --upload-file "$f" \
+                 "ftp://$FTP_HOST/classmatcher/$(basename "$f")"
+          done
+          echo "Publish fertig: version.json $(grep -o '\"version\"[^,]*' version.json)"
