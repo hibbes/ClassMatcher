@@ -295,6 +295,46 @@ def _interleave_genders(students: list) -> list:
     return merged
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Geteilte Delta-Scoring-Helfer (von allen vier SA-Loops genutzt)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _gender_of(sid: str, student_map: dict) -> str:
+    return student_map[sid]["geschlecht"] if sid in student_map else ""
+
+
+def _affected_pairs(moved, resolved_wishes: dict, who_wishes_for: dict) -> set:
+    """(Wuenscher, Gewuenschter)-Paare, deren Erfuellungs-Status sich aendern
+    kann, wenn die SuS in `moved` die Klasse wechseln."""
+    pairs = set()
+    for s in moved:
+        for f in resolved_wishes.get(s, ()):
+            pairs.add((s, f))
+        for w in who_wishes_for.get(s, ()):
+            pairs.add((w, s))
+    return pairs
+
+
+def _fulfilled_in(pairs, s2c: dict) -> int:
+    """Anzahl der Paare, die in der Zuordnung s2c in derselben Klasse sind."""
+    n = 0
+    for w, f in pairs:
+        cw = s2c.get(w)
+        if cw is not None and s2c.get(f) == cw:
+            n += 1
+    return n
+
+
+def _count_violations(s2c: dict, dont_be_with: list) -> int:
+    """Anzahl der dont-be-with-Paare, die in s2c in derselben Klasse landen."""
+    v = 0
+    for pair in dont_be_with:
+        a, b = pair.get("a"), pair.get("b")
+        if a and b and s2c.get(a) and s2c.get(a) == s2c.get(b):
+            v += 1
+    return v
+
+
 def optimize_mixed_assignment(
     fill_students:    list,   # Schüler, die auf Klassen verteilt werden (Normal + Musikzug)
     class_ids:        list,   # alle Klassen-IDs
@@ -411,16 +451,13 @@ def optimize_mixed_assignment(
         for _w_fid in _w_friends:
             who_wishes_for[_w_fid].append(_w_sid)
 
-    def _gender_of(sid):
-        return student_map[sid]["geschlecht"] if sid in student_map else ""
-
     sid2cls: dict = {}
     gender_counts: dict = {}
     for cid in class_ids:
         boys = girls = 0
         for sid in fixed.get(cid, []) + z_asgn[cid]:
             sid2cls[sid] = cid
-            g = _gender_of(sid)
+            g = _gender_of(sid, student_map)
             if g == "m":
                 boys += 1
             elif g == "w":
@@ -431,23 +468,6 @@ def optimize_mixed_assignment(
     for sid in music_ids:
         if sid in sid2cls:
             music_per_class[sid2cls[sid]] += 1
-
-    def _affected_pairs(moved):
-        pairs = set()
-        for s in moved:
-            for f in resolved_wishes.get(s, ()):
-                pairs.add((s, f))
-            for w in who_wishes_for.get(s, ()):
-                pairs.add((w, s))
-        return pairs
-
-    def _fulfilled_in(pairs, s2c):
-        n = 0
-        for w, f in pairs:
-            cw = s2c.get(w)
-            if cw is not None and s2c.get(f) == cw:
-                n += 1
-        return n
 
     def _score() -> float:
         sc = 0.0
@@ -509,7 +529,7 @@ def optimize_mixed_assignment(
     def _move(sid, from_c, to_c):
         """sid2cls + gender_counts + music_per_class fuer einen Umzug pflegen."""
         sid2cls[sid] = to_c
-        g = _gender_of(sid)
+        g = _gender_of(sid, student_map)
         if g == "m":
             gender_counts[from_c][0] -= 1
             gender_counts[to_c][0]   += 1
@@ -548,7 +568,7 @@ def optimize_mixed_assignment(
             z_asgn[c2][i2] = sid1
             z_asgn[c3][i3] = sid2
             old_friend = friend_count
-            pairs  = _affected_pairs((sid1, sid2, sid3))
+            pairs  = _affected_pairs((sid1, sid2, sid3), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             _move(sid1, c1, c2)
             _move(sid2, c2, c3)
@@ -585,7 +605,7 @@ def optimize_mixed_assignment(
             z_asgn[c1][i1], z_asgn[c2][i2] = sid2, sid1
 
             old_friend = friend_count
-            pairs  = _affected_pairs((sid1, sid2))
+            pairs  = _affected_pairs((sid1, sid2), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             _move(sid1, c1, c2)
             _move(sid2, c2, c1)
@@ -857,31 +877,6 @@ def refine_friends_klasse5(
         for sid in sids:
             sid2cls[sid] = cid
 
-    def _affected_pairs(moved):
-        pairs = set()
-        for s in moved:
-            for f in resolved_wishes.get(s, ()):
-                pairs.add((s, f))
-            for w in who_wishes_for.get(s, ()):
-                pairs.add((w, s))
-        return pairs
-
-    def _fulfilled_in(pairs, s2c):
-        n = 0
-        for w, f in pairs:
-            cw = s2c.get(w)
-            if cw is not None and s2c.get(f) == cw:
-                n += 1
-        return n
-
-    def _violations(s2c):
-        v = 0
-        for pair in dont_be_with:
-            a, b = pair.get("a"), pair.get("b")
-            if a and b and s2c.get(a) and s2c.get(a) == s2c.get(b):
-                v += 1
-        return v
-
     friend_count = 0
     for sid, friends in resolved_wishes.items():
         if sid not in sid2cls:
@@ -890,7 +885,7 @@ def refine_friends_klasse5(
             if sid2cls.get(fid) == sid2cls[sid]:
                 friend_count += 1
 
-    cur_score  = float(friend_count - 1_000_000 * _violations(sid2cls))
+    cur_score  = float(friend_count - 1_000_000 * _count_violations(sid2cls, dont_be_with))
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
@@ -923,11 +918,11 @@ def refine_friends_klasse5(
             asgn[c1][i1] = sid3
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
-            pairs  = _affected_pairs((sid1, sid2, sid3))
+            pairs  = _affected_pairs((sid1, sid2, sid3), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c2, c3, c1
             new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
-            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            new_score  = float(new_friend - 1_000_000 * _count_violations(sid2cls, dont_be_with))
             delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -951,11 +946,11 @@ def refine_friends_klasse5(
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
-            pairs  = _affected_pairs((sid1, sid2))
+            pairs  = _affected_pairs((sid1, sid2), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             sid2cls[sid1], sid2cls[sid2] = c2, c1
             new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
-            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            new_score  = float(new_friend - 1_000_000 * _count_violations(sid2cls, dont_be_with))
             delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -1466,9 +1461,6 @@ def optimize_klasse8_assignment(
         for _w_fid in _w_friends:
             who_wishes_for[_w_fid].append(_w_sid)
 
-    def _gender_of(sid):
-        return student_map[sid]["geschlecht"] if sid in student_map else ""
-
     sid2cls: dict = {}
     gender_counts: dict = {}
     profile_counter: dict = {p: Counter()
@@ -1477,7 +1469,7 @@ def optimize_klasse8_assignment(
         boys = girls = 0
         for sid in asgn[cid]:
             sid2cls[sid] = cid
-            g = _gender_of(sid)
+            g = _gender_of(sid, student_map)
             if g == "m":
                 boys += 1
             elif g == "w":
@@ -1486,23 +1478,6 @@ def optimize_klasse8_assignment(
             if p in profile_counter:
                 profile_counter[p][cid] += 1
         gender_counts[cid] = [boys, girls]
-
-    def _affected_pairs(moved):
-        pairs = set()
-        for s in moved:
-            for f in resolved_wishes.get(s, ()):
-                pairs.add((s, f))
-            for w in who_wishes_for.get(s, ()):
-                pairs.add((w, s))
-        return pairs
-
-    def _fulfilled_in(pairs, s2c):
-        n = 0
-        for w, f in pairs:
-            cw = s2c.get(w)
-            if cw is not None and s2c.get(f) == cw:
-                n += 1
-        return n
 
     def _score() -> float:
         sc = 0.0
@@ -1565,7 +1540,7 @@ def optimize_klasse8_assignment(
     def _move(sid, from_c, to_c):
         """sid2cls + gender_counts + profile_counter fuer einen Umzug pflegen."""
         sid2cls[sid] = to_c
-        g = _gender_of(sid)
+        g = _gender_of(sid, student_map)
         if g == "m":
             gender_counts[from_c][0] -= 1
             gender_counts[to_c][0]   += 1
@@ -1641,7 +1616,7 @@ def optimize_klasse8_assignment(
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
             old_friend = friend_count
-            pairs  = _affected_pairs((sid1, sid2, sid3))
+            pairs  = _affected_pairs((sid1, sid2, sid3), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             _move(sid1, c1, c2)
             _move(sid2, c2, c3)
@@ -1680,7 +1655,7 @@ def optimize_klasse8_assignment(
 
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
             old_friend = friend_count
-            pairs  = _affected_pairs((sid1, sid2))
+            pairs  = _affected_pairs((sid1, sid2), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             _move(sid1, c1, c2)
             _move(sid2, c2, c1)
@@ -1984,31 +1959,6 @@ def refine_friends_klasse8(
         for sid in sids:
             sid2cls[sid] = cid
 
-    def _affected_pairs(moved):
-        pairs = set()
-        for s in moved:
-            for f in resolved_wishes.get(s, ()):
-                pairs.add((s, f))
-            for w in who_wishes_for.get(s, ()):
-                pairs.add((w, s))
-        return pairs
-
-    def _fulfilled_in(pairs, s2c):
-        n = 0
-        for w, f in pairs:
-            cw = s2c.get(w)
-            if cw is not None and s2c.get(f) == cw:
-                n += 1
-        return n
-
-    def _violations(s2c):
-        v = 0
-        for pair in dont_be_with:
-            a, b = pair.get("a"), pair.get("b")
-            if a and b and s2c.get(a) and s2c.get(a) == s2c.get(b):
-                v += 1
-        return v
-
     friend_count = 0
     for sid, friends in resolved_wishes.items():
         if sid not in sid2cls:
@@ -2017,7 +1967,7 @@ def refine_friends_klasse8(
             if sid2cls.get(fid) == sid2cls[sid]:
                 friend_count += 1
 
-    cur_score  = float(friend_count - 1_000_000 * _violations(sid2cls))
+    cur_score  = float(friend_count - 1_000_000 * _count_violations(sid2cls, dont_be_with))
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
@@ -2091,11 +2041,11 @@ def refine_friends_klasse8(
             asgn[c1][i1] = sid3
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
-            pairs  = _affected_pairs((sid1, sid2, sid3))
+            pairs  = _affected_pairs((sid1, sid2, sid3), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c2, c3, c1
             new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
-            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            new_score  = float(new_friend - 1_000_000 * _count_violations(sid2cls, dont_be_with))
             delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -2122,11 +2072,11 @@ def refine_friends_klasse8(
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
-            pairs  = _affected_pairs((sid1, sid2))
+            pairs  = _affected_pairs((sid1, sid2), resolved_wishes, who_wishes_for)
             before = _fulfilled_in(pairs, sid2cls)
             sid2cls[sid1], sid2cls[sid2] = c2, c1
             new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
-            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            new_score  = float(new_friend - 1_000_000 * _count_violations(sid2cls, dont_be_with))
             delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
