@@ -520,14 +520,19 @@ def optimize_mixed_assignment(
             music_per_class[from_c] -= 1
             music_per_class[to_c]   += 1
 
+    # Freie Positionen pro Klasse sind invariant: Swaps tauschen freie SuS
+    # nur unter freien Positionen. Einmal vorberechnen statt pro Iteration.
+    free_pos = {cid: [i for i, sid in enumerate(z_asgn[cid]) if sid in free_ids]
+                for cid in class_ids}
+
     for _ in range(iterations):
         use_rotate = (n_cls >= 3 and random.random() < 0.25)
 
         if use_rotate:
             c1, c2, c3 = random.sample(class_ids, 3)
-            p1 = [i for i, sid in enumerate(z_asgn[c1]) if sid in free_ids]
-            p2 = [i for i, sid in enumerate(z_asgn[c2]) if sid in free_ids]
-            p3 = [i for i, sid in enumerate(z_asgn[c3]) if sid in free_ids]
+            p1 = free_pos[c1]
+            p2 = free_pos[c2]
+            p3 = free_pos[c3]
             if not (p1 and p2 and p3):
                 T = max(T_min, T * cool)
                 continue
@@ -564,8 +569,8 @@ def optimize_mixed_assignment(
                 friend_count = old_friend
         else:
             c1, c2 = random.sample(class_ids, 2)
-            pool1  = [i for i, sid in enumerate(z_asgn[c1]) if sid in free_ids]
-            pool2  = [i for i, sid in enumerate(z_asgn[c2]) if sid in free_ids]
+            pool1  = free_pos[c1]
+            pool2  = free_pos[c2]
             if not pool1 or not pool2:
                 T = max(T_min, T * cool)
                 continue
@@ -894,15 +899,17 @@ def refine_friends_klasse5(
     T_min      = 0.02
     cool       = (T_min / T) ** (1.0 / iterations)
     n_cls      = len(class_ids)
+    free_pos   = {cid: [i for i, sid in enumerate(asgn[cid]) if sid in free_ids]
+                  for cid in class_ids}
 
     for _ in range(iterations):
         use_rotate = (n_cls >= 3 and random.random() < 0.30)
 
         if use_rotate:
             c1, c2, c3 = random.sample(class_ids, 3)
-            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
-            p3 = [i for i, sid in enumerate(asgn[c3]) if sid in free_ids]
+            p1 = free_pos[c1]
+            p2 = free_pos[c2]
+            p3 = free_pos[c3]
             if not (p1 and p2 and p3):
                 T = max(T_min, T * cool)
                 continue
@@ -933,8 +940,8 @@ def refine_friends_klasse5(
                 sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c1, c2, c3
         else:
             c1, c2 = random.sample(class_ids, 2)
-            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            p1 = free_pos[c1]
+            p2 = free_pos[c2]
             if not p1 or not p2:
                 T = max(T_min, T * cool)
                 continue
@@ -1601,14 +1608,17 @@ def optimize_klasse8_assignment(
                     return True
         return False
 
+    free_pos = {cid: [i for i, sid in enumerate(asgn[cid]) if sid in free_ids]
+                for cid in class_ids}
+
     for _ in range(iterations):
         use_rotate = (n_cls >= 3 and random.random() < 0.25)
 
         if use_rotate:
             c1, c2, c3 = random.sample(class_ids, 3)
-            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
-            p3 = [i for i, sid in enumerate(asgn[c3]) if sid in free_ids]
+            p1 = free_pos[c1]
+            p2 = free_pos[c2]
+            p3 = free_pos[c3]
             if not p1 or not p2 or not p3:
                 T = max(T_min, T * cool)
                 continue
@@ -1648,8 +1658,8 @@ def optimize_klasse8_assignment(
                 friend_count = old_friend
         else:
             c1, c2 = random.sample(class_ids, 2)
-            pool1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-            pool2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            pool1 = free_pos[c1]
+            pool2 = free_pos[c2]
             if not pool1 or not pool2:
                 T = max(T_min, T * cool)
                 continue
@@ -2050,15 +2060,17 @@ def refine_friends_klasse8(
     T          = 4.0
     T_min      = 0.02
     cool       = (T_min / T) ** (1.0 / iterations)
+    free_pos   = {cid: [i for i, sid in enumerate(asgn[cid]) if sid in free_ids]
+                  for cid in class_ids}
 
     for _ in range(iterations):
         use_rotate = (len(class_ids) >= 3 and random.random() < 0.30)
 
         if use_rotate:
             c1, c2, c3 = random.sample(class_ids, 3)
-            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
-            p3 = [i for i, sid in enumerate(asgn[c3]) if sid in free_ids]
+            p1 = free_pos[c1]
+            p2 = free_pos[c2]
+            p3 = free_pos[c3]
             if not (p1 and p2 and p3):
                 T = max(T_min, T * cool)
                 continue
@@ -2092,8 +2104,8 @@ def refine_friends_klasse8(
                 sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c1, c2, c3
         else:
             c1, c2 = random.sample(class_ids, 2)
-            p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
-            p2 = [i for i, sid in enumerate(asgn[c2]) if sid in free_ids]
+            p1 = free_pos[c1]
+            p2 = free_pos[c2]
             if not p1 or not p2:
                 T = max(T_min, T * cool)
                 continue
