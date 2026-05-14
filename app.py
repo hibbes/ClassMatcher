@@ -252,11 +252,11 @@ def _klasse8_role_classes(response_classes: list, students_list: list) -> tuple:
                 bili_set.add(cid)
             if s.get("latein"):
                 latein_set.add(cid)
-            if s.get("profil") == PROFIL_MUSIK:
+            if s.get("profil") == PROFIL_MUSIK and not s.get("bili"):
                 musik_set.add(cid)
     bili_classes   = sorted(bili_set)
     latein_classes = sorted(latein_set)
-    musik_class    = next(iter(musik_set), None)
+    musik_class    = next(iter(sorted(musik_set)), None)
     return bili_classes, latein_classes, musik_class
 
 

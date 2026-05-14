@@ -122,6 +122,19 @@ def check_invariants(mode, students, locked, snap):
     for sid, cid in locked.items():
         if sid in ids and cls_of.get(sid) != cid:
             errs.append(f"Lock verletzt: {sid} ist in {cls_of.get(sid)} statt {cid}")
+    if mode == "klasse8":
+        # Hard-Constraint: Musik-Profil und Bili-Zug sind klassendisjunkt.
+        sm = {s["id"]: s for s in students}
+        for cid, sids in snap["assignment"].items():
+            has_bili = any(sm.get(sid, {}).get("bili") for sid in sids)
+            has_pure_musik = any(
+                sm.get(sid, {}).get("profil") == matcher.PROFIL_MUSIK
+                and not sm.get(sid, {}).get("bili")
+                for sid in sids
+            )
+            if has_bili and has_pure_musik:
+                errs.append(f"Klasse {cid}: Bili- und reine Musik-SuS gemischt "
+                            "(Disjunktheit verletzt)")
     return errs
 
 

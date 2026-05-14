@@ -1,87 +1,87 @@
 {
   "assignment": {
     "8a": [
-      "test06-person06-7c",
-      "test11-person11-7d",
-      "test12-person12-7a",
-      "test15-person15-7d",
-      "test16-person16-7a",
-      "test19-person19-7d",
-      "test23-person23-7d",
-      "test31-person31-7d",
-      "test32-person32-7a",
-      "test35-person35-7d",
-      "test36-person36-7a",
-      "test39-person39-7d",
-      "test43-person43-7d",
-      "test44-person44-7a",
-      "test47-person47-7d",
-      "test48-person48-7a",
-      "test55-person55-7d",
-      "test59-person59-7d",
-      "test60-person60-7a",
-      "test63-person63-7d",
-      "test67-person67-7d",
-      "test71-person71-7d",
-      "test75-person75-7d"
-    ],
-    "8b": [
-      "test00-person00-7a",
-      "test03-person03-7d",
-      "test08-person08-7a",
       "test09-person09-7b",
+      "test10-person10-7c",
+      "test12-person12-7a",
       "test18-person18-7c",
-      "test24-person24-7a",
-      "test27-person27-7d",
       "test28-person28-7a",
       "test29-person29-7b",
       "test30-person30-7c",
       "test42-person42-7c",
-      "test49-person49-7b",
       "test51-person51-7d",
       "test52-person52-7a",
       "test53-person53-7b",
       "test54-person54-7c",
+      "test56-person56-7a",
+      "test57-person57-7b",
+      "test58-person58-7c",
+      "test60-person60-7a",
       "test61-person61-7b",
+      "test62-person62-7c",
       "test66-person66-7c",
       "test69-person69-7b",
       "test70-person70-7c",
-      "test72-person72-7a"
+      "test72-person72-7a",
+      "test73-person73-7b"
     ],
-    "8c": [
+    "8b": [
+      "test00-person00-7a",
       "test01-person01-7b",
       "test02-person02-7c",
+      "test03-person03-7d",
       "test04-person04-7a",
       "test05-person05-7b",
-      "test10-person10-7c",
+      "test06-person06-7c",
       "test14-person14-7c",
-      "test17-person17-7b",
-      "test20-person20-7a",
-      "test21-person21-7b",
-      "test22-person22-7c",
+      "test24-person24-7a",
       "test25-person25-7b",
       "test26-person26-7c",
+      "test27-person27-7d",
       "test33-person33-7b",
       "test34-person34-7c",
+      "test36-person36-7a",
       "test37-person37-7b",
       "test38-person38-7c",
       "test40-person40-7a",
       "test45-person45-7b",
+      "test48-person48-7a",
+      "test49-person49-7b"
+    ],
+    "8c": [
+      "test08-person08-7a",
+      "test11-person11-7d",
+      "test15-person15-7d",
+      "test16-person16-7a",
+      "test17-person17-7b",
+      "test19-person19-7d",
+      "test20-person20-7a",
+      "test21-person21-7b",
+      "test22-person22-7c",
+      "test23-person23-7d",
+      "test31-person31-7d",
+      "test32-person32-7a",
+      "test35-person35-7d",
+      "test39-person39-7d",
+      "test43-person43-7d",
+      "test44-person44-7a",
       "test46-person46-7c",
-      "test56-person56-7a",
-      "test57-person57-7b",
-      "test58-person58-7c",
-      "test62-person62-7c",
+      "test47-person47-7d",
+      "test55-person55-7d",
+      "test59-person59-7d",
+      "test63-person63-7d",
       "test64-person64-7a",
       "test65-person65-7b",
-      "test73-person73-7b",
-      "test74-person74-7c"
+      "test67-person67-7d",
+      "test71-person71-7d",
+      "test74-person74-7c",
+      "test75-person75-7d"
     ]
   },
   "tracks": [
     [
       "8a",
-      "8x"
+      "8y"
     ],
     [
       "8b",
@@ -89,7 +89,7 @@
     ],
     [
       "8c",
-      "8z"
+      "8x"
     ]
   ],
   "class_sizes": [
@@ -106,7 +106,7 @@
       27
     ]
   ],
-  "fulfilled_total": 73,
+  "fulfilled_total": 79,
   "violations_total": 0,
   "n_resolved_wishes": 134
 }

@@ -1903,8 +1903,12 @@ def refine_friends_klasse8(
                              if any(sid in bili_ids for sid in asgn[cid])})
     latein_classes = sorted({cid for cid in class_ids
                              if any(sid in latein_ids for sid in asgn[cid])})
+    # Musik-Klasse = erste Klasse mit REINEN Musik-SuS (Musik & nicht Bili).
+    # Sonst wuerde eine Bili-Klasse mit Bili+Musik-SuS faelschlich als
+    # Musik-Klasse gelten und forbidden_for reine Musik-SuS dorthin ziehen.
     musik_class    = next(
-        (cid for cid in class_ids if any(sid in musik_ids for sid in asgn[cid])),
+        (cid for cid in class_ids
+         if any(sid in musik_ids and sid not in bili_ids for sid in asgn[cid])),
         None,
     )
 
