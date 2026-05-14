@@ -401,20 +401,96 @@ def optimize_mixed_assignment(
     _place(latin_only,  non_lf)             # Latein: nur lateinfrei AUS
     _place(rest,        class_ids)          # Rest: alle Klassen
 
-    # ── Scoring-Funktion ─────────────────────────────────────────
-    def full(z):
-        return {cid: fixed.get(cid, []) + z[cid] for cid in class_ids}
+    # ── Delta-Scoring-Setup ──────────────────────────────────────
+    # score_assignment wird inkrementell ausgewertet: friend_count als
+    # Integer-Akkumulator, gender_counts/music_per_class als gepflegte
+    # Aggregate. Gender/Musik werden pro Schritt O(Klassen) in Original-
+    # Reihenfolge neu summiert -> byte-identischer Score.
+    who_wishes_for: dict = defaultdict(list)
+    for _w_sid, _w_friends in resolved_wishes.items():
+        for _w_fid in _w_friends:
+            who_wishes_for[_w_fid].append(_w_sid)
 
-    def score(z):
-        return score_assignment(
-            full(z), resolved_wishes, dont_be_with,
-            w_friend, w_gender, student_map,
-            w_music_split=w_music_split,
-            music_ids=music_ids,
-            bili_class=bili_class,
-        )
+    def _gender_of(sid):
+        return student_map[sid]["geschlecht"] if sid in student_map else ""
 
-    cur_score  = score(z_asgn)
+    sid2cls: dict = {}
+    gender_counts: dict = {}
+    for cid in class_ids:
+        boys = girls = 0
+        for sid in fixed.get(cid, []) + z_asgn[cid]:
+            sid2cls[sid] = cid
+            g = _gender_of(sid)
+            if g == "m":
+                boys += 1
+            elif g == "w":
+                girls += 1
+        gender_counts[cid] = [boys, girls]
+
+    music_per_class: Counter = Counter()
+    for sid in music_ids:
+        if sid in sid2cls:
+            music_per_class[sid2cls[sid]] += 1
+
+    def _affected_pairs(moved):
+        pairs = set()
+        for s in moved:
+            for f in resolved_wishes.get(s, ()):
+                pairs.add((s, f))
+            for w in who_wishes_for.get(s, ()):
+                pairs.add((w, s))
+        return pairs
+
+    def _fulfilled_in(pairs, s2c):
+        n = 0
+        for w, f in pairs:
+            cw = s2c.get(w)
+            if cw is not None and s2c.get(f) == cw:
+                n += 1
+        return n
+
+    def _score() -> float:
+        sc = 0.0
+        if w_friend > 0:
+            sc += w_friend * friend_count
+        vio = 0
+        for pair in dont_be_with:
+            a, b = pair.get("a"), pair.get("b")
+            if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
+                vio += 1
+        sc -= 10_000 * vio
+        if w_gender > 0:
+            for cid in class_ids:
+                boys, girls = gender_counts[cid]
+                total = boys + girls
+                if total:
+                    balance = 1.0 - abs(boys - girls) / total
+                    sc += w_gender * balance * 10
+        if music_ids:
+            if bili_class and music_per_class.get(bili_class, 0) > 0:
+                sc -= 50_000 * music_per_class[bili_class]
+            if w_music_split > 0:
+                eligible = sorted(
+                    (music_per_class.get(c, 0) for c in class_ids if c != bili_class),
+                    reverse=True,
+                )
+                if len(eligible) >= 2:
+                    top1, top2  = eligible[0], eligible[1]
+                    spillover   = sum(eligible[2:])
+                    imbalance   = abs(top1 - top2)
+                    penalty     = imbalance + 3 * spillover
+                    sc -= (w_music_split * w_music_split / 100.0) * penalty
+        return sc
+
+    friend_count = 0
+    for sid, friends in resolved_wishes.items():
+        if sid not in sid2cls:
+            continue
+        for fid in friends:
+            if sid2cls.get(fid) == sid2cls[sid]:
+                friend_count += 1
+
+    cur_score  = _score()
     best_asgn  = {k: list(v) for k, v in z_asgn.items()}
     best_score = cur_score
 
@@ -429,6 +505,20 @@ def optimize_mixed_assignment(
     T_min      = 0.05
     cool       = (T_min / T) ** (1.0 / iterations)
     n_cls      = len(class_ids)
+
+    def _move(sid, from_c, to_c):
+        """sid2cls + gender_counts + music_per_class fuer einen Umzug pflegen."""
+        sid2cls[sid] = to_c
+        g = _gender_of(sid)
+        if g == "m":
+            gender_counts[from_c][0] -= 1
+            gender_counts[to_c][0]   += 1
+        elif g == "w":
+            gender_counts[from_c][1] -= 1
+            gender_counts[to_c][1]   += 1
+        if sid in music_ids:
+            music_per_class[from_c] -= 1
+            music_per_class[to_c]   += 1
 
     for _ in range(iterations):
         use_rotate = (n_cls >= 3 and random.random() < 0.25)
@@ -452,7 +542,14 @@ def optimize_mixed_assignment(
             z_asgn[c1][i1] = sid3
             z_asgn[c2][i2] = sid1
             z_asgn[c3][i3] = sid2
-            new_score = score(z_asgn)
+            old_friend = friend_count
+            pairs  = _affected_pairs((sid1, sid2, sid3))
+            before = _fulfilled_in(pairs, sid2cls)
+            _move(sid1, c1, c2)
+            _move(sid2, c2, c3)
+            _move(sid3, c3, c1)
+            friend_count = old_friend + _fulfilled_in(pairs, sid2cls) - before
+            new_score = _score()
             delta     = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -461,6 +558,10 @@ def optimize_mixed_assignment(
                     best_asgn  = {k: list(v) for k, v in z_asgn.items()}
             else:
                 z_asgn[c1][i1], z_asgn[c2][i2], z_asgn[c3][i3] = sid1, sid2, sid3
+                _move(sid1, c2, c1)
+                _move(sid2, c3, c2)
+                _move(sid3, c1, c3)
+                friend_count = old_friend
         else:
             c1, c2 = random.sample(class_ids, 2)
             pool1  = [i for i, sid in enumerate(z_asgn[c1]) if sid in free_ids]
@@ -478,7 +579,13 @@ def optimize_mixed_assignment(
 
             z_asgn[c1][i1], z_asgn[c2][i2] = sid2, sid1
 
-            new_score = score(z_asgn)
+            old_friend = friend_count
+            pairs  = _affected_pairs((sid1, sid2))
+            before = _fulfilled_in(pairs, sid2cls)
+            _move(sid1, c1, c2)
+            _move(sid2, c2, c1)
+            friend_count = old_friend + _fulfilled_in(pairs, sid2cls) - before
+            new_score = _score()
             delta     = new_score - cur_score
 
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
@@ -488,6 +595,9 @@ def optimize_mixed_assignment(
                     best_asgn  = {k: list(v) for k, v in z_asgn.items()}
             else:
                 z_asgn[c1][i1], z_asgn[c2][i2] = sid1, sid2
+                _move(sid1, c2, c1)
+                _move(sid2, c1, c2)
+                friend_count = old_friend
 
         T = max(T_min, T * cool)
 
@@ -1338,13 +1448,96 @@ def optimize_klasse8_assignment(
     place_friend_aware(latein_only, latein_classes if latein_classes else class_ids)
     place_friend_aware(rest,        class_ids)
 
-    def score(z):
-        return score_klasse8(
-            z, resolved_wishes, dont_be_with,
-            w_friend, w_gender, w_profile, student_map,
-        )
+    # ── Delta-Scoring-Setup ──────────────────────────────────────
+    # friend_count als Integer-Akkumulator pro Swap; gender_counts
+    # gepflegt (Gender pro Schritt O(Klassen) neu). Der Profil-Term
+    # wird pro Schritt aus asgn in Klassen-Reihenfolge neu aufgebaut
+    # (O(n)) - exakt die Reihenfolge, in der score_klasse8 sid2cls und
+    # profile_counter aufbaut, daher byte-identisch.
+    who_wishes_for: dict = defaultdict(list)
+    for _w_sid, _w_friends in resolved_wishes.items():
+        for _w_fid in _w_friends:
+            who_wishes_for[_w_fid].append(_w_sid)
 
-    cur_score  = score(asgn)
+    def _gender_of(sid):
+        return student_map[sid]["geschlecht"] if sid in student_map else ""
+
+    sid2cls: dict = {}
+    gender_counts: dict = {}
+    for cid in class_ids:
+        boys = girls = 0
+        for sid in asgn[cid]:
+            sid2cls[sid] = cid
+            g = _gender_of(sid)
+            if g == "m":
+                boys += 1
+            elif g == "w":
+                girls += 1
+        gender_counts[cid] = [boys, girls]
+
+    def _affected_pairs(moved):
+        pairs = set()
+        for s in moved:
+            for f in resolved_wishes.get(s, ()):
+                pairs.add((s, f))
+            for w in who_wishes_for.get(s, ()):
+                pairs.add((w, s))
+        return pairs
+
+    def _fulfilled_in(pairs, s2c):
+        n = 0
+        for w, f in pairs:
+            cw = s2c.get(w)
+            if cw is not None and s2c.get(f) == cw:
+                n += 1
+        return n
+
+    def _score() -> float:
+        sc = 0.0
+        if w_friend > 0:
+            sc += w_friend * friend_count
+        vio = 0
+        for pair in dont_be_with:
+            a, b = pair.get("a"), pair.get("b")
+            if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
+                vio += 1
+        sc -= 10_000 * vio
+        if w_gender > 0:
+            for cid in class_ids:
+                boys, girls = gender_counts[cid]
+                total = boys + girls
+                if total:
+                    balance = 1.0 - abs(boys - girls) / total
+                    sc += w_gender * balance * 10
+        if w_profile > 0:
+            profile_counter: dict = defaultdict(lambda: Counter())
+            for cid in class_ids:
+                for sid in asgn[cid]:
+                    s = student_map.get(sid)
+                    if s is None:
+                        continue
+                    p = s.get("profil") or ""
+                    if p in (PROFIL_NWT, PROFIL_SPANISCH, PROFIL_IMP):
+                        profile_counter[p][cid] += 1
+            for p, counts in profile_counter.items():
+                total_p = sum(counts.values())
+                if total_p == 0:
+                    continue
+                max_cluster = max(counts.values())
+                concentration = max_cluster / total_p
+                spread = len(counts)
+                sc += (w_profile * w_profile / 100.0) * (concentration * 10 - spread)
+        return sc
+
+    friend_count = 0
+    for sid, friends in resolved_wishes.items():
+        if sid not in sid2cls:
+            continue
+        for fid in friends:
+            if sid2cls.get(fid) == sid2cls[sid]:
+                friend_count += 1
+
+    cur_score  = _score()
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
@@ -1361,6 +1554,17 @@ def optimize_klasse8_assignment(
     cool       = (T_min / T) ** (1.0 / iterations)
 
     n_cls = len(class_ids)
+
+    def _move(sid, from_c, to_c):
+        """sid2cls + gender_counts fuer einen Umzug pflegen."""
+        sid2cls[sid] = to_c
+        g = _gender_of(sid)
+        if g == "m":
+            gender_counts[from_c][0] -= 1
+            gender_counts[to_c][0]   += 1
+        elif g == "w":
+            gender_counts[from_c][1] -= 1
+            gender_counts[to_c][1]   += 1
 
     def dont_conflict_after_swap(c1, c2, sid1, sid2):
         """sid1 wandert nach c2, sid2 nach c1 – Konflikt?"""
@@ -1422,7 +1626,14 @@ def optimize_klasse8_assignment(
             asgn[c1][i1] = sid3
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
-            new_score = score(asgn)
+            old_friend = friend_count
+            pairs  = _affected_pairs((sid1, sid2, sid3))
+            before = _fulfilled_in(pairs, sid2cls)
+            _move(sid1, c1, c2)
+            _move(sid2, c2, c3)
+            _move(sid3, c3, c1)
+            friend_count = old_friend + _fulfilled_in(pairs, sid2cls) - before
+            new_score = _score()
             delta     = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -1431,6 +1642,10 @@ def optimize_klasse8_assignment(
                     best_asgn  = {k: list(v) for k, v in asgn.items()}
             else:
                 asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
+                _move(sid1, c2, c1)
+                _move(sid2, c3, c2)
+                _move(sid3, c1, c3)
+                friend_count = old_friend
         else:
             c1, c2 = random.sample(class_ids, 2)
             pool1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
@@ -1450,7 +1665,13 @@ def optimize_klasse8_assignment(
                 continue
 
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
-            new_score = score(asgn)
+            old_friend = friend_count
+            pairs  = _affected_pairs((sid1, sid2))
+            before = _fulfilled_in(pairs, sid2cls)
+            _move(sid1, c1, c2)
+            _move(sid2, c2, c1)
+            friend_count = old_friend + _fulfilled_in(pairs, sid2cls) - before
+            new_score = _score()
             delta     = new_score - cur_score
 
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
@@ -1460,6 +1681,9 @@ def optimize_klasse8_assignment(
                     best_asgn  = {k: list(v) for k, v in asgn.items()}
             else:
                 asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+                _move(sid1, c2, c1)
+                _move(sid2, c1, c2)
+                friend_count = old_friend
 
         T = max(T_min, T * cool)
 
