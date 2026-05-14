@@ -5,7 +5,7 @@ a = Analysis(
     ['launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('static', 'static'), ('app.py', '.'), ('matcher.py', '.')],
+    datas=[('static', 'static'), ('app.py', '.'), ('matcher.py', '.'), ('update.py', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

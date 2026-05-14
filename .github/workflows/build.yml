@@ -52,6 +52,7 @@ jobs:
             --add-data "static:static" \
             --add-data "app.py:." \
             --add-data "matcher.py:." \
+            --add-data "update.py:." \
             launcher.py
 
       - name: DMG erstellen
@@ -116,6 +117,7 @@ jobs:
             --add-data "static;static" `
             --add-data "app.py;." `
             --add-data "matcher.py;." `
+            --add-data "update.py;." `
             launcher.py
 
       - name: EXE hochladen
