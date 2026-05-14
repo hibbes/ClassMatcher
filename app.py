@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5.3"
+APP_VERSION = "1.5.4"
 
 app = Flask(__name__, static_folder="static")
 
@@ -46,6 +46,9 @@ _state: dict = {
         "weightProfileCluster":   50,    # 0..100 – Modus klasse8: Profile zusammenhalten
         "multiStart":              5,    # Modus klasse8: Anzahl Multi-Start-SA-Läufe
         "autoRefine":              2,    # Modus klasse8: Friend-Refinement-Pässe pro Run
+        # Power-User-Parameter (kein UI-Regler) – via POST /api/params oder Speicherdatei:
+        "lateinMode":       "strict",    # Modus klasse8: "strict" | "musik_exception"
+        "forceNumClasses":      None,    # Modus klasse8: feste Klassenzahl statt Auto
     },
 }
 
@@ -56,6 +59,24 @@ _state: dict = {
 
 def _student_map():
     return {s["id"]: s for s in _state["students"]}
+
+
+def _pending_count() -> int:
+    """Anzahl Schüler mit noch offenen Fuzzy-Wünschen."""
+    return sum(1 for v in _state["pending_wishes"].values() if v)
+
+
+def _apply_class_names(classes: list) -> None:
+    """Klassennamen setzen: manuelle Umbenennung gewinnt, sonst Standard-Default."""
+    if _state["mode"] == "klasse8":
+        defaults = {cls["id"]: cls["id"].upper() for cls in classes}
+    else:
+        defaults = {"5y": "Bili-Klasse"}
+    for cls in classes:
+        if cls["id"] in _state["class_names"]:
+            cls["name"] = _state["class_names"][cls["id"]]
+        elif cls["id"] in defaults:
+            cls["name"] = defaults[cls["id"]]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -111,7 +132,7 @@ def upload():
         _state["class_names"]     = {}
         _state["dont_be_with"]    = []
 
-        pending_count = sum(1 for v in _state["pending_wishes"].values() if v)
+        pending_count = _pending_count()
 
         return jsonify({
             "count":        len(students),
@@ -176,7 +197,7 @@ def resolve_wish():
             if p.get("token") != token
         ]
 
-    pending_count = sum(1 for v in _state["pending_wishes"].values() if v)
+    pending_count = _pending_count()
     return jsonify({"ok": True, "pendingCount": pending_count})
 
 
@@ -307,7 +328,6 @@ def assign():
                 _state["dont_be_with"],
                 locked_students=locked,
             )
-            _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in classes}
         else:
             classes = calculate_classes(
                 _state["students"],
@@ -316,14 +336,8 @@ def assign():
                 _state["dont_be_with"],
                 locked_students=locked,
             )
-            _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
 
-        # Standard-Klassennamen, sofern nicht manuell umbenannt
-        for cls in classes:
-            if cls["id"] in _state["class_names"]:
-                cls["name"] = _state["class_names"][cls["id"]]
-            elif cls["id"] in _DEFAULT_NAMES:
-                cls["name"] = _DEFAULT_NAMES[cls["id"]]
+        _apply_class_names(classes)
 
         sm = _student_map()
 
@@ -391,16 +405,7 @@ def refine_friends():
                 _state["resolved_wishes"], _state["dont_be_with"],
                 locked_students=_state["locked_students"],
             )
-        if _state["mode"] == "klasse8":
-            _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in classes}
-        else:
-            _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
-
-        for cls in classes:
-            if cls["id"] in _state["class_names"]:
-                cls["name"] = _state["class_names"][cls["id"]]
-            elif cls["id"] in _DEFAULT_NAMES:
-                cls["name"] = _DEFAULT_NAMES[cls["id"]]
+        _apply_class_names(classes)
 
         sm = _student_map()
         response_classes = [
@@ -489,7 +494,10 @@ def load_state():
 
     data = request.json or {}
 
-    _state["mode"]            = data.get("mode", "klasse5")
+    mode = data.get("mode", "klasse5")
+    if mode not in ("klasse5", "klasse8"):
+        return jsonify({"error": "Ungültige Speicherdatei (unbekannter Modus)"}), 400
+    _state["mode"]            = mode
     _state["students"]        = data.get("students", [])
     _state["resolved_wishes"] = data.get("resolved_wishes", {})
     _state["pending_wishes"]  = data.get("pending_wishes", {})
@@ -507,15 +515,7 @@ def load_state():
     sm = _student_map()
 
     # Klassenname aus class_names anwenden (analog zu assign())
-    if _state["mode"] == "klasse8":
-        _DEFAULT_NAMES = {cls["id"]: cls["id"].upper() for cls in saved_classes}
-    else:
-        _DEFAULT_NAMES = {"5y": "Bili-Klasse"}
-    for cls in saved_classes:
-        if cls["id"] in _state["class_names"]:
-            cls["name"] = _state["class_names"][cls["id"]]
-        elif cls["id"] in _DEFAULT_NAMES and cls["id"] not in _state["class_names"]:
-            cls["name"] = _DEFAULT_NAMES[cls["id"]]
+    _apply_class_names(saved_classes)
 
     _attach_wish_info(saved_classes, sm)
 
@@ -529,7 +529,7 @@ def load_state():
 
     _state["last_assignment"] = {"classes": saved_classes, "stats": stats}
 
-    pending_count = sum(1 for v in _state["pending_wishes"].values() if v)
+    pending_count = _pending_count()
 
     return jsonify({
         "classes":      saved_classes,

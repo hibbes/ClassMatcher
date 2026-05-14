@@ -151,6 +151,11 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
+function modeSubtitle(count) {
+  const label = state.mode === "klasse8" ? "Klasse 8 mischen" : "Klasse 5 einteilen";
+  return `${count} Schüler:innen · ${label}`;
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Views
 // ──────────────────────────────────────────────────────────────────
@@ -513,15 +518,19 @@ function setupDropZone(listEl) {
 // Zuweisung durchführen
 // ──────────────────────────────────────────────────────────────────
 
+function applyAssignmentResult(result) {
+  state.classes = result.classes;
+  state.stats   = result.stats;
+  showView("board");
+  renderBoard();
+}
+
 async function doAssign(showLoading = true) {
   if (showLoading) showView("loading");
   try {
     const result = await api.assign();
     if (result.error) { alert("Fehler: " + result.error); return; }
-    state.classes = result.classes;
-    state.stats   = result.stats;
-    showView("board");
-    renderBoard();
+    applyAssignmentResult(result);
   } catch (err) {
     alert("Verbindungsfehler: " + err.message);
     showView("board");
@@ -818,9 +827,10 @@ function buildPrintView() {
     const wishSummary = st.total_wishes > 0
       ? ` · ${st.fulfilled_wishes} von ${st.total_wishes} Wünschen erfüllt` : "";
 
+    const yr = new Date().getFullYear();
     const headerLine = state.mode === "klasse8"
-      ? `Klasse 8 · Schuljahr ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`
-      : `Klasse 5 · Schuljahr ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`;
+      ? `Klasse 8 · Schuljahr ${yr}/${yr + 1}`
+      : `Klasse 5 · Schuljahr ${yr}/${yr + 1}`;
 
     const zugColTitle = state.mode === "klasse8" ? "Profil" : "Zug";
 
@@ -897,14 +907,14 @@ async function loadStateFromFile(file) {
     }
 
     state.mode            = result.mode || data.mode || "klasse5";
-    state.students        = result.classes.flatMap(c => c.students);
+    state.students        = await (await fetch("/api/students")).json();
     state.lockedStudents  = data.locked_students || {};
     state.dontBeWith      = data.dont_be_with    || [];
     state.params          = Object.assign({}, state.params, data.params || {});
     state.classes         = result.classes;
     state.stats           = result.stats;
 
-    updateSubtitle(`${result.count} Schüler:innen · ${state.mode === "klasse8" ? "Klasse 8 mischen" : "Klasse 5 einteilen"}`);
+    updateSubtitle(modeSubtitle(result.count));
     updateFuzzyBadge(result.pendingCount);
     applyModeUI();
     setupParams();
@@ -949,6 +959,15 @@ async function init() {
   applyModeUI();
   showView("upload");
 
+  // App-Version vom Backend holen – Single Source of Truth ist app.py
+  fetch("/api/version")
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById("app-version");
+      if (el && d.version) el.textContent = "v" + d.version;
+    })
+    .catch(() => {});
+
   // ── Mode-Toggle ───────────────────────────────────────────
   document.getElementById("mode-klasse5").addEventListener("click", () => {
     state.mode = "klasse5";
@@ -979,7 +998,7 @@ async function init() {
 
     state.mode     = result.mode || state.mode;
     state.students = await (await fetch("/api/students")).json();
-    updateSubtitle(`${result.count} Schüler:innen · ${state.mode === "klasse8" ? "Klasse 8 mischen" : "Klasse 5 einteilen"}`);
+    updateSubtitle(modeSubtitle(result.count));
     updateFuzzyBadge(result.pendingCount);
 
     applyModeUI();
@@ -1013,10 +1032,7 @@ async function init() {
     try {
       const result = await api.refineFriends();
       if (result.error) { alert("Fehler: " + result.error); showView("board"); return; }
-      state.classes = result.classes;
-      state.stats   = result.stats;
-      showView("board");
-      renderBoard();
+      applyAssignmentResult(result);
       const after = state.stats.reduce((a, s) => a + (s.fulfilled_wishes || 0), 0);
       const delta = after - before;
       updateSubtitle(`Freundes-Refinement: ${after}/${total} Wünsche (${delta >= 0 ? "+" : ""}${delta})`);

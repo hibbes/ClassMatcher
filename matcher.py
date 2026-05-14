@@ -498,7 +498,12 @@ BILI_TRACK  = "5y"   # Bili – eigene Klasse, keine Musikzug-Schüler
 FILL_TRACK  = "5z"   # Normalzug – verteilt auf alle Nicht-Bili-Klassen
 
 
-def _wish_score_classes_dict(classes: list, resolved_wishes: dict) -> int:
+def _track_of(cid: str) -> str:
+    """Track-Präfix einer Klassen-ID: '5z-1' -> '5z', '8a' -> '8a'."""
+    return cid.rsplit("-", 1)[0] if "-" in cid else cid
+
+
+def _count_fulfilled_wishes(classes: list, resolved_wishes: dict) -> int:
     sid2cls: dict = {}
     for c in classes:
         for sid in c["students"]:
@@ -543,7 +548,7 @@ def calculate_classes(
                 students, cur, params, resolved_wishes, dont_be_with,
                 locked_students,
             )
-        score = _wish_score_classes_dict(cl, resolved_wishes)
+        score = _count_fulfilled_wishes(cl, resolved_wishes)
         if score > best_score:
             best_score   = score
             best_classes = cl
@@ -637,9 +642,6 @@ def _calculate_classes_single(
         w_music_split=w_music_split,
     )
 
-    def _track_of(cid):
-        return cid.rsplit("-", 1)[0] if "-" in cid else cid
-
     return [
         {
             "id":       cid,
@@ -700,8 +702,6 @@ def refine_friends_klasse5(
                 if sid not in locked_ids}
 
     if len(class_ids) < 2 or not free_ids:
-        def _track_of(cid):
-            return cid.rsplit("-", 1)[0] if "-" in cid else cid
         return [
             {"id": cid, "name": cid, "track": _track_of(cid),
              "students": asgn[cid]}
@@ -799,8 +799,6 @@ def refine_friends_klasse5(
 
         T = max(T_min, T * cool)
 
-    def _track_of(cid):
-        return cid.rsplit("-", 1)[0] if "-" in cid else cid
     return [
         {"id": cid, "name": cid, "track": _track_of(cid),
          "students": best_asgn[cid]}
@@ -932,7 +930,7 @@ def parse_csv_klasse8(content: str) -> list:
     Klasse-8-Algorithmus braucht. Verlasser und Nicht-Wähler werden
     übersprungen (gehen nicht in die Liste).
     """
-    content = content.lstrip("﻿")
+    content = content.lstrip("﻿")  # BOM entfernen (Fallback, utf-8-sig deckt es meist ab)
     reader = csv.DictReader(io.StringIO(content), delimiter=";")
 
     bili_col     = "Ich bin im Bili - Zug"
@@ -1406,21 +1404,6 @@ def optimize_klasse8_assignment(
 # Klasse 8 – Haupt-Einstiegspunkt
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _wish_score(classes: list, resolved_wishes: dict) -> int:
-    sid2cls: dict = {}
-    for c in classes:
-        for sid in c["students"]:
-            sid2cls[sid] = c["id"]
-    s = 0
-    for sid, friends in resolved_wishes.items():
-        if sid not in sid2cls:
-            continue
-        for fid in friends:
-            if sid2cls.get(fid) == sid2cls[sid]:
-                s += 1
-    return s
-
-
 def calculate_classes_klasse8(
     students:        list,
     params:          dict,
@@ -1453,7 +1436,7 @@ def calculate_classes_klasse8(
                 students, cur, params, resolved_wishes, dont_be_with,
                 locked_students,
             )
-        score = _wish_score(cl, resolved_wishes)
+        score = _count_fulfilled_wishes(cl, resolved_wishes)
         if score > best_score:
             best_score   = score
             best_classes = cl
