@@ -1471,6 +1471,8 @@ def optimize_klasse8_assignment(
 
     sid2cls: dict = {}
     gender_counts: dict = {}
+    profile_counter: dict = {p: Counter()
+                             for p in (PROFIL_NWT, PROFIL_SPANISCH, PROFIL_IMP)}
     for cid in class_ids:
         boys = girls = 0
         for sid in asgn[cid]:
@@ -1480,6 +1482,9 @@ def optimize_klasse8_assignment(
                 boys += 1
             elif g == "w":
                 girls += 1
+            p = student_map[sid].get("profil") if sid in student_map else None
+            if p in profile_counter:
+                profile_counter[p][cid] += 1
         gender_counts[cid] = [boys, girls]
 
     def _affected_pairs(moved):
@@ -1517,22 +1522,17 @@ def optimize_klasse8_assignment(
                     balance = 1.0 - abs(boys - girls) / total
                     sc += w_gender * balance * 10
         if w_profile > 0:
-            profile_counter: dict = defaultdict(lambda: Counter())
-            for cid in class_ids:
-                for sid in asgn[cid]:
-                    s = student_map.get(sid)
-                    if s is None:
-                        continue
-                    p = s.get("profil") or ""
-                    if p in (PROFIL_NWT, PROFIL_SPANISCH, PROFIL_IMP):
-                        profile_counter[p][cid] += 1
-            for p, counts in profile_counter.items():
+            # profile_counter wird inkrementell gepflegt (_move); feste
+            # Reihenfolge NWT/Spanisch/IMP statt zuweisungs-abhaengiger
+            # dict-Ordnung -> deterministisch und O(Klassen) statt O(n).
+            for p in (PROFIL_NWT, PROFIL_SPANISCH, PROFIL_IMP):
+                counts = profile_counter[p]
                 total_p = sum(counts.values())
                 if total_p == 0:
                     continue
                 max_cluster = max(counts.values())
                 concentration = max_cluster / total_p
-                spread = len(counts)
+                spread = sum(1 for v in counts.values() if v > 0)
                 sc += (w_profile * w_profile / 100.0) * (concentration * 10 - spread)
         return sc
 
@@ -1563,7 +1563,7 @@ def optimize_klasse8_assignment(
     n_cls = len(class_ids)
 
     def _move(sid, from_c, to_c):
-        """sid2cls + gender_counts fuer einen Umzug pflegen."""
+        """sid2cls + gender_counts + profile_counter fuer einen Umzug pflegen."""
         sid2cls[sid] = to_c
         g = _gender_of(sid)
         if g == "m":
@@ -1572,6 +1572,10 @@ def optimize_klasse8_assignment(
         elif g == "w":
             gender_counts[from_c][1] -= 1
             gender_counts[to_c][1]   += 1
+        p = student_map[sid].get("profil") if sid in student_map else None
+        if p in profile_counter:
+            profile_counter[p][from_c] -= 1
+            profile_counter[p][to_c]   += 1
 
     def dont_conflict_after_swap(c1, c2, sid1, sid2):
         """sid1 wandert nach c2, sid2 nach c1 – Konflikt?"""

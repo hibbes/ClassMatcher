@@ -8,20 +8,18 @@
       "test16-person16-7a",
       "test19-person19-7d",
       "test23-person23-7d",
-      "test27-person27-7d",
-      "test28-person28-7a",
       "test31-person31-7d",
       "test32-person32-7a",
       "test35-person35-7d",
       "test36-person36-7a",
       "test39-person39-7d",
-      "test40-person40-7a",
       "test43-person43-7d",
       "test44-person44-7a",
       "test47-person47-7d",
       "test48-person48-7a",
       "test55-person55-7d",
       "test59-person59-7d",
+      "test60-person60-7a",
       "test63-person63-7d",
       "test67-person67-7d",
       "test71-person71-7d",
@@ -34,6 +32,8 @@
       "test09-person09-7b",
       "test18-person18-7c",
       "test24-person24-7a",
+      "test27-person27-7d",
+      "test28-person28-7a",
       "test29-person29-7b",
       "test30-person30-7c",
       "test42-person42-7c",
@@ -42,7 +42,6 @@
       "test52-person52-7a",
       "test53-person53-7b",
       "test54-person54-7c",
-      "test60-person60-7a",
       "test61-person61-7b",
       "test66-person66-7c",
       "test69-person69-7b",
@@ -66,6 +65,7 @@
       "test34-person34-7c",
       "test37-person37-7b",
       "test38-person38-7c",
+      "test40-person40-7a",
       "test45-person45-7b",
       "test46-person46-7c",
       "test56-person56-7a",
@@ -95,18 +95,18 @@
   "class_sizes": [
     [
       "8a",
-      25
+      23
     ],
     [
       "8b",
-      20
+      21
     ],
     [
       "8c",
-      26
+      27
     ]
   ],
-  "fulfilled_total": 76,
+  "fulfilled_total": 73,
   "violations_total": 0,
   "n_resolved_wishes": 134
 }
