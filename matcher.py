@@ -728,25 +728,54 @@ def refine_friends_klasse5(
         _forbidden_cache[sid] = f
         return f
 
-    def score(z: dict) -> float:
-        sid2cls: dict = {}
-        for cid, sids in z.items():
-            for sid in sids:
-                sid2cls[sid] = cid
-        sc = 0.0
-        for sid, friends in resolved_wishes.items():
-            if sid not in sid2cls:
-                continue
-            for fid in friends:
-                if sid2cls.get(fid) == sid2cls[sid]:
-                    sc += 1.0
+    # ── Delta-Scoring-Setup ──────────────────────────────────────
+    # Score = fulfilled_count * 1.0 - violation_count * 1_000_000.
+    # fulfilled_count wird inkrementell pro Swap mitgefuehrt, statt pro
+    # Iteration alle Wuensche neu zu zaehlen (war der O(n)-Hotspot).
+    who_wishes_for: dict = defaultdict(list)
+    for _w_sid, _w_friends in resolved_wishes.items():
+        for _w_fid in _w_friends:
+            who_wishes_for[_w_fid].append(_w_sid)
+
+    sid2cls: dict = {}
+    for cid, sids in asgn.items():
+        for sid in sids:
+            sid2cls[sid] = cid
+
+    def _affected_pairs(moved):
+        pairs = set()
+        for s in moved:
+            for f in resolved_wishes.get(s, ()):
+                pairs.add((s, f))
+            for w in who_wishes_for.get(s, ()):
+                pairs.add((w, s))
+        return pairs
+
+    def _fulfilled_in(pairs, s2c):
+        n = 0
+        for w, f in pairs:
+            cw = s2c.get(w)
+            if cw is not None and s2c.get(f) == cw:
+                n += 1
+        return n
+
+    def _violations(s2c):
+        v = 0
         for pair in dont_be_with:
             a, b = pair.get("a"), pair.get("b")
-            if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
-                sc -= 1_000_000
-        return sc
+            if a and b and s2c.get(a) and s2c.get(a) == s2c.get(b):
+                v += 1
+        return v
 
-    cur_score  = score(asgn)
+    friend_count = 0
+    for sid, friends in resolved_wishes.items():
+        if sid not in sid2cls:
+            continue
+        for fid in friends:
+            if sid2cls.get(fid) == sid2cls[sid]:
+                friend_count += 1
+
+    cur_score  = float(friend_count - 1_000_000 * _violations(sid2cls))
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
@@ -777,15 +806,21 @@ def refine_friends_klasse5(
             asgn[c1][i1] = sid3
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
-            new_score = score(asgn)
-            delta     = new_score - cur_score
+            pairs  = _affected_pairs((sid1, sid2, sid3))
+            before = _fulfilled_in(pairs, sid2cls)
+            sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c2, c3, c1
+            new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
+            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
+                friend_count = new_friend
                 if cur_score > best_score:
                     best_score = cur_score
                     best_asgn  = {k: list(v) for k, v in asgn.items()}
             else:
                 asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
+                sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c1, c2, c3
         else:
             c1, c2 = random.sample(class_ids, 2)
             p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
@@ -799,15 +834,21 @@ def refine_friends_klasse5(
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
-            new_score = score(asgn)
-            delta     = new_score - cur_score
+            pairs  = _affected_pairs((sid1, sid2))
+            before = _fulfilled_in(pairs, sid2cls)
+            sid2cls[sid1], sid2cls[sid2] = c2, c1
+            new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
+            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
+                friend_count = new_friend
                 if cur_score > best_score:
                     best_score = cur_score
                     best_asgn  = {k: list(v) for k, v in asgn.items()}
             else:
                 asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+                sid2cls[sid1], sid2cls[sid2] = c1, c2
 
         T = max(T_min, T * cool)
 
@@ -1694,25 +1735,51 @@ def refine_friends_klasse8(
         _forbidden_cache[sid] = f
         return f
 
-    def score(z: dict) -> float:
-        sid2cls: dict = {}
-        for cid, sids in z.items():
-            for sid in sids:
-                sid2cls[sid] = cid
-        sc = 0.0
-        for sid, friends in resolved_wishes.items():
-            if sid not in sid2cls:
-                continue
-            for fid in friends:
-                if sid2cls.get(fid) == sid2cls[sid]:
-                    sc += 1.0
+    # ── Delta-Scoring-Setup (siehe refine_friends_klasse5) ───────
+    who_wishes_for: dict = defaultdict(list)
+    for _w_sid, _w_friends in resolved_wishes.items():
+        for _w_fid in _w_friends:
+            who_wishes_for[_w_fid].append(_w_sid)
+
+    sid2cls: dict = {}
+    for cid, sids in asgn.items():
+        for sid in sids:
+            sid2cls[sid] = cid
+
+    def _affected_pairs(moved):
+        pairs = set()
+        for s in moved:
+            for f in resolved_wishes.get(s, ()):
+                pairs.add((s, f))
+            for w in who_wishes_for.get(s, ()):
+                pairs.add((w, s))
+        return pairs
+
+    def _fulfilled_in(pairs, s2c):
+        n = 0
+        for w, f in pairs:
+            cw = s2c.get(w)
+            if cw is not None and s2c.get(f) == cw:
+                n += 1
+        return n
+
+    def _violations(s2c):
+        v = 0
         for pair in dont_be_with:
             a, b = pair.get("a"), pair.get("b")
-            if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
-                sc -= 1_000_000  # bleibt unverletzbar
-        return sc
+            if a and b and s2c.get(a) and s2c.get(a) == s2c.get(b):
+                v += 1
+        return v
 
-    cur_score  = score(asgn)
+    friend_count = 0
+    for sid, friends in resolved_wishes.items():
+        if sid not in sid2cls:
+            continue
+        for fid in friends:
+            if sid2cls.get(fid) == sid2cls[sid]:
+                friend_count += 1
+
+    cur_score  = float(friend_count - 1_000_000 * _violations(sid2cls))
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
@@ -1784,15 +1851,21 @@ def refine_friends_klasse8(
             asgn[c1][i1] = sid3
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
-            new_score = score(asgn)
-            delta     = new_score - cur_score
+            pairs  = _affected_pairs((sid1, sid2, sid3))
+            before = _fulfilled_in(pairs, sid2cls)
+            sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c2, c3, c1
+            new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
+            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
+                friend_count = new_friend
                 if cur_score > best_score:
                     best_score = cur_score
                     best_asgn  = {k: list(v) for k, v in asgn.items()}
             else:
                 asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
+                sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c1, c2, c3
         else:
             c1, c2 = random.sample(class_ids, 2)
             p1 = [i for i, sid in enumerate(asgn[c1]) if sid in free_ids]
@@ -1809,15 +1882,21 @@ def refine_friends_klasse8(
                 T = max(T_min, T * cool)
                 continue
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
-            new_score = score(asgn)
-            delta     = new_score - cur_score
+            pairs  = _affected_pairs((sid1, sid2))
+            before = _fulfilled_in(pairs, sid2cls)
+            sid2cls[sid1], sid2cls[sid2] = c2, c1
+            new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
+            new_score  = float(new_friend - 1_000_000 * _violations(sid2cls))
+            delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
+                friend_count = new_friend
                 if cur_score > best_score:
                     best_score = cur_score
                     best_asgn  = {k: list(v) for k, v in asgn.items()}
             else:
                 asgn[c1][i1], asgn[c2][i2] = sid1, sid2
+                sid2cls[sid1], sid2cls[sid2] = c1, c2
 
         T = max(T_min, T * cool)
 
