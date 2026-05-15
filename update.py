@@ -15,7 +15,7 @@ from pathlib import Path
 MANIFEST_URL = "https://schiller-offenburg.de/classmatcher/version.json"
 _CONFIG_PATH = Path.home() / ".classmatcher.cfg"
 _TIMEOUT = 4            # Sekunden – Manifest-Check
-_DOWNLOAD_TIMEOUT = 60  # Sekunden pro Lese-Block beim Binary-Download
+_DOWNLOAD_TIMEOUT = 60  # Sekunden Socket-Idle-Timeout beim Binary-Download
 
 
 def _read_local_config() -> dict:
@@ -90,21 +90,32 @@ def check_for_update(current_version: str, *,
     return result
 
 
-def download_update(download_url: str, *, _config=_read_local_config) -> dict:
+def download_update(download_url: str, *,
+                    _config=_read_local_config,
+                    _opener_factory=_opener,
+                    _target_dir=None) -> dict:
     """Lädt das Binary nach ~/Downloads/. Liefert {ok: True, path} bzw.
-    bei jedem Fehler {ok: False, fallback_url} (→ Browser-Fallback im UI)."""
+    bei jedem Fehler {ok: False, fallback_url} (→ Browser-Fallback im UI).
+    Die Unterstrich-Parameter sind Test-Nahtstellen."""
+    part = None
     try:
         cfg = _config()
         filename = download_url.rsplit("/", 1)[-1] or "ClassMatcher-Update"
-        target_dir = Path.home() / "Downloads"
+        target_dir = Path(_target_dir) if _target_dir is not None else Path.home() / "Downloads"
         target_dir.mkdir(parents=True, exist_ok=True)
         final = target_dir / filename
         part = final.parent / (final.name + ".part")
-        with _opener(cfg).open(download_url, timeout=_DOWNLOAD_TIMEOUT) as resp, \
+        with _opener_factory(cfg).open(download_url, timeout=_DOWNLOAD_TIMEOUT) as resp, \
                 open(part, "wb") as fh:
             while chunk := resp.read(65536):
                 fh.write(chunk)
         part.replace(final)
         return {"ok": True, "path": str(final)}
     except Exception:
+        # Stale .part-Datei aufräumen, falls die Übertragung mittendrin abbrach
+        if part is not None:
+            try:
+                part.unlink(missing_ok=True)
+            except OSError:
+                pass
         return {"ok": False, "fallback_url": download_url}

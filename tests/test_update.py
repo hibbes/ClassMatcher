@@ -10,7 +10,9 @@ Benutzung:
 
 Exit 0 = alle Tests gruen, 1 = Fehlschlag.
 """
+import io
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -110,6 +112,44 @@ def test_update_check_off_disables():
         _config=lambda: {"update_check": "off"},
     )
     assert res["update_available"] is False
+
+
+@case
+def test_download_update_happy_path():
+    """Stubbed opener returns an in-memory BytesIO -> file written, {ok: True}."""
+    class _FakeOpener:
+        def open(self, url, timeout=None):
+            return io.BytesIO(b"BINARY-CONTENT-OK")
+    with tempfile.TemporaryDirectory() as td:
+        res = update.download_update(
+            "https://x/file-v1.exe",
+            _config=lambda: {},
+            _opener_factory=lambda cfg: _FakeOpener(),
+            _target_dir=td,
+        )
+        files = sorted(p.name for p in Path(td).iterdir())
+    assert res["ok"] is True
+    assert res["path"].endswith("file-v1.exe")
+    assert files == ["file-v1.exe"], f"Erwartete nur die fertige Datei, fand: {files}"
+
+
+@case
+def test_download_update_failure_returns_fallback_and_cleans_part():
+    """Opener raises -> {ok: False, fallback_url}, kein .part-Rest im Zielordner."""
+    class _BrokenOpener:
+        def open(self, url, timeout=None):
+            raise OSError("Proxy blockiert")
+    with tempfile.TemporaryDirectory() as td:
+        res = update.download_update(
+            "https://x/file-v1.exe",
+            _config=lambda: {},
+            _opener_factory=lambda cfg: _BrokenOpener(),
+            _target_dir=td,
+        )
+        leftover = sorted(p.name for p in Path(td).iterdir())
+    assert res["ok"] is False
+    assert res["fallback_url"] == "https://x/file-v1.exe"
+    assert leftover == [], f"Erwartete sauberes Zielverzeichnis, fand: {leftover}"
 
 
 def main() -> int:

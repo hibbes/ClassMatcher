@@ -99,8 +99,13 @@ def check_update():
     Aus dem Quellcode gestartet (nicht-frozen) → immer 'kein Update'."""
     import sys
     if not getattr(sys, "frozen", False):
-        return jsonify({"update_available": False, "current": APP_VERSION,
-                        "latest": None, "download_url": None, "notes": None})
+        return jsonify({
+            "update_available": False,
+            "current": APP_VERSION,
+            "latest": None,
+            "download_url": None,
+            "notes": None,
+        })
     import update
     return jsonify(update.check_for_update(APP_VERSION))
 
