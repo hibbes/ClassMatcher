@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.8"
+APP_VERSION = "1.6.9"
 
 app = Flask(__name__, static_folder="static")
 

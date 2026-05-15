@@ -221,9 +221,8 @@
 
       <section class="help-section">
         <h3>1. Programm starten</h3>
-        <p>Öffnen Sie ein Terminal, wechseln Sie in den Programmordner und führen Sie aus:</p>
-        <code>./run.sh</code>
-        <p>Der Browser öffnet sich automatisch auf <strong>http://localhost:5001</strong>. Das Programm läuft ausschließlich lokal – keine Daten verlassen Ihren Computer.</p>
+        <p>Starten Sie die App per <strong>Doppelklick</strong> auf <code>Schiller-Klassen-Mixer.exe</code> (Windows) bzw. auf das App-Icon im Programme-Ordner (Mac). Es öffnet sich nach einer Sekunde ein Browser-Fenster mit der Adresse <strong>http://localhost:5001</strong>.</p>
+        <p>Die App läuft komplett lokal: keine Daten verlassen Ihren Computer. Die einzigen Internet-Zugriffe sind ein gelegentlicher Update-Check und der optionale Download neuerer Versionen.</p>
       </section>
 
       <section class="help-section">
@@ -240,17 +239,19 @@
 
       <section class="help-section">
         <h3>4. Klassenübersicht verstehen</h3>
-        <p>Jede Klasse wird als Spalte dargestellt. Auf jeder Schülerkarte sehen Sie:</p>
+        <p>Jede Klasse wird als Spalte dargestellt. Klassennamen werden automatisch nach Rolle vergeben: <strong>5a (Musikteile)</strong>, <strong>5b (Musikteile)</strong>, <strong>5c (Bili)</strong>, <strong>5d (Französisch)</strong>. Die Spalten erscheinen in dieser Reihenfolge. Per Klick auf den Namen können Sie ihn jederzeit umbenennen.</p>
+        <p>Auf jeder Schülerkarte sehen Sie:</p>
         <ul>
           <li><span class="help-dot m"></span> / <span class="help-dot w"></span> Geschlecht (blau = Junge, pink = Mädchen)</li>
           <li><strong>Name</strong> des Schülers / der Schülerin</li>
           <li><span class="badge badge-5x">Musik</span> <span class="badge badge-5y">Bili</span> <span class="badge badge-5z">Normal</span> gewählter Zug</li>
           <li><span class="badge badge-F">Franzö.</span> <span class="badge badge-L">Latein</span> zweite Fremdsprache</li>
+          <li><span class="badge badge-ru-rk">Reli K</span> <span class="badge badge-ru-ev">Reli Ev</span> <span class="badge badge-ru-eth">Ethik</span> belegter Religionsunterricht (Quelle: CSV-Feld <em>RU</em>)</li>
           <li><span class="wish-tag wish-ok">✓ Name</span> Freundeswunsch erfüllt (grün)</li>
-          <li><span class="wish-tag wish-miss">✗ Name → 5z-1</span> Wunsch nicht erfüllt, mit Zielklasse (orange)</li>
+          <li><span class="wish-tag wish-miss">✗ Name → 5b</span> Wunsch nicht erfüllt, mit Zielklasse (orange); Mauszeiger drüberhalten zeigt den Grund (z.B. Bili-Sperre, Latein-Sperre, Klasse voll)</li>
           <li><span style="font-size:12px">🔒</span> Schüler wurde manuell verschoben und ist gesperrt</li>
         </ul>
-        <p>Der <strong>Klassenname</strong> (z.B. „Musikzug") kann durch Anklicken direkt umbenannt werden.</p>
+        <div class="help-hint"><strong>Rote Markierung am linken Rand</strong> einer Karte bedeutet: dieser Schüler / diese Schülerin hat <em>keinen einzigen</em> Freundeswunsch erfüllt bekommen. Mauszeiger über die Karte halten zeigt die Gründe pro Wunsch. So sehen Sie auf einen Blick, wem die Zuweisung gerade noch nicht gerecht wird.</div>
       </section>
 
       <section class="help-section">
@@ -260,9 +261,9 @@
           <tr><td><strong>Max. Schüler/Klasse</strong></td><td>Maximale Klassengröße. Daraus ergibt sich auch die Anzahl der Klassen automatisch.</td></tr>
           <tr><td><strong>Freundeswunsch</strong></td><td>Wie stark soll versucht werden, Freundschaftswünsche zu erfüllen? (0 = ignorieren, 10 = maximale Priorität)</td></tr>
           <tr><td><strong>Geschlechterbalance</strong></td><td>Wie ausgeglichen soll das Verhältnis von Jungen und Mädchen pro Klasse sein?</td></tr>
-          <tr><td><strong>Musikzug-Verteilung</strong></td><td>Wie streng sollen die Musikzug-Schüler:innen auf <em>genau zwei</em> Klassen (nie die Bili-Klasse) gleichmäßig verteilt werden? 0 % = egal, 100 % = strikte 50/50-Aufteilung.</td></tr>
+          <tr><td><strong>Musikzug-Verteilung</strong></td><td>Wie gleichmäßig sollen die Musikzug-Schüler:innen <em>innerhalb</em> der zwei Musikteile-Klassen (5a/5b) aufgeteilt werden? 0 % = egal, welche Verteilung; 100 % = strikte 50/50-Balance. Die Beschränkung auf genau zwei Klassen ist eine feste Regel (siehe unten) und unabhängig vom Regler.</td></tr>
         </table>
-        <p class="help-hint">Feste Regeln, immer aktiv: Die Bili-Klasse bekommt nie Musikzug-Schüler:innen. Die letzte Normalzug-Klasse bleibt latein­frei. Manuell verschobene Schüler:innen können diese Regeln überschreiben.</p>
+        <p class="help-hint"><strong>Feste Regeln, immer aktiv:</strong> Die Bili-Klasse bekommt nie Musikzug-Schüler:innen. Musikzug-Schüler:innen landen in <em>höchstens zwei</em> Klassen, nie verstreut über mehr. Die latein­freie Klasse (Französisch-Zug, 5d) bekommt keine Latein-Schüler:innen. Mindestens-ein-Wunsch-Regel: der Algorithmus bevorzugt Verteilungen, in denen jede Schülerin bzw. jeder Schüler wenigstens einen Freundeswunsch erfüllt bekommt, auch wenn andere dafür einen zweiten Wunsch nicht erhalten. Manuell verschobene Schüler:innen (🔒) bleiben dort, wo Sie sie hingezogen haben, auch wenn das eine Regel formal bricht.</p>
       </section>
 
       <section class="help-section">
@@ -281,9 +282,10 @@
         <h3>8. Drucken</h3>
         <p>Der Button <strong>Drucken</strong> öffnet den Druckdialog des Browsers. Für jede Klasse wird eine eigene Seite erzeugt mit:</p>
         <ul>
-          <li>Schullogo, Klassenname und Datum</li>
+          <li>Schullogo, Klassenname (5a / 5b / 5c / 5d) und Datum</li>
           <li>Statistik-Zeile (Anzahl, Jungen/Mädchen, erfüllte Wünsche)</li>
-          <li>Tabelle mit: Lfd. Nr. · Name, Vorname · Zug · 2. Fremdsprache · Wunschfreunde in der Klasse</li>
+          <li>Tabelle mit: Lfd. Nr. · Name, Vorname · Zug · 2. Fremdsprache · Religionsunterricht · Wunschfreunde in der Klasse</li>
+          <li>Schüler:innen alphabetisch nach Nachnamen sortiert</li>
         </ul>
         <div class="help-hint">Tipp: Im Browser-Druckdialog „Hintergrundgrafiken drucken" aktivieren, damit die farbige Tabellenüberschrift erscheint.</div>
       </section>
@@ -305,7 +307,11 @@
           </tr>
           <tr>
             <td><strong>Kann ich die Klassen umbenennen?</strong></td>
-            <td>Ja – einfach den Klassennamen in der Spaltenüberschrift anklicken, neuen Namen eintippen und mit Enter bestätigen.</td>
+            <td>Ja – einfach den Klassennamen in der Spaltenüberschrift anklicken, neuen Namen eintippen und mit Enter bestätigen. Die automatischen Namen 5a/5b/5c/5d sind nur Voreinstellungen, Ihre Umbenennung gewinnt und bleibt auch nach Neuberechnungen erhalten.</td>
+          </tr>
+          <tr>
+            <td><strong>Warum hat ein:e Schüler:in einen roten Rand?</strong></td>
+            <td>Diese:r Schüler:in hat keinen einzigen Freundeswunsch erfüllt bekommen. Mauszeiger über die Karte halten zeigt die Gründe (z.B. „Wunschfreund ist in der Bili-Klasse, hier aber kein Bili"). Häufig hilft manuelles Verschieben per Drag &amp; Drop.</td>
           </tr>
           <tr>
             <td><strong>Werden meine Daten gespeichert?</strong></td>
