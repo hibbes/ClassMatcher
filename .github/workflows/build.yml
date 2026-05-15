@@ -59,9 +59,16 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          # Staging-Ordner: App + symbolischer Link auf /Applications
+          # (in Finder als "Programme" sichtbar), damit Nutzer:innen die
+          # App per Drag-and-Drop installieren koennen wie gewohnt.
+          rm -rf dmg-stage
+          mkdir -p dmg-stage
+          cp -R "dist/Schiller-Klassen-Mixer-v${VERSION}.app" dmg-stage/
+          ln -s /Applications dmg-stage/Programme
           hdiutil create \
             -volname "Schiller-Klassen-Mixer v${VERSION}" \
-            -srcfolder "dist/Schiller-Klassen-Mixer-v${VERSION}.app" \
+            -srcfolder dmg-stage \
             -ov -format UDZO \
             "Schiller-Klassen-Mixer-v${VERSION}.dmg"
 
