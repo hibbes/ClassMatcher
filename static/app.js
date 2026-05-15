@@ -1231,6 +1231,18 @@ async function init() {
     })
     .catch(() => {});
 
+  // Heartbeat: alle 15s ein POST an /api/heartbeat. Server hat 30s Karenz
+  // ohne Heartbeat, beendet sich danach selbst. Tab-Refresh ist
+  // unkritisch: der neue Tab nimmt den Heartbeat sofort wieder auf,
+  // bevor der Watchdog feuert. Bewusst kein navigator.sendBeacon, weil
+  // pagehide auch beim Reload feuert und wir den Server da nicht killen
+  // wollen — der Watchdog-Timeout ist refresh-safe.
+  const sendHeartbeat = () => {
+    fetch("/api/heartbeat", { method: "POST", keepalive: true }).catch(() => {});
+  };
+  sendHeartbeat();
+  setInterval(sendHeartbeat, 15000);
+
   // Auto-Update-Check (nicht-blockierend, scheitert still)
   checkForUpdate();
 

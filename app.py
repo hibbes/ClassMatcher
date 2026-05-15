@@ -3,10 +3,12 @@ ClassMatcher – Flask-Backend
 Läuft lokal auf http://localhost:5001
 """
 import os
+import time
+import threading
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.14"
+APP_VERSION = "1.6.15"
 
 app = Flask(__name__, static_folder="static")
 
@@ -158,6 +160,51 @@ def index():
 @app.route("/api/version")
 def version():
     return jsonify({"version": APP_VERSION})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Heartbeat / Auto-Shutdown
+# Browser sendet alle ~15s einen Heartbeat; wenn fuer eine Karenzzeit
+# (HEARTBEAT_TIMEOUT) kein Heartbeat eintrudelt, beendet sich der Server selbst.
+# Damit verschwindet der Hintergrund-Prozess automatisch wenn der User den
+# Browser-Tab schliesst. Tab-Refresh ist kein Problem, weil der neue Tab den
+# Heartbeat innerhalb 1-2s wieder aufnimmt.
+# ──────────────────────────────────────────────────────────────────────────────
+
+HEARTBEAT_TIMEOUT = 30  # Sekunden ohne Heartbeat -> Shutdown
+_heartbeat_lock   = threading.Lock()
+_last_heartbeat   = time.time() + 60   # 60s Initial-Karenz, falls Browser
+                                       # erstmal noch laedt
+_shutdown_started = False
+
+
+@app.route("/api/heartbeat", methods=["POST"])
+def heartbeat():
+    global _last_heartbeat
+    with _heartbeat_lock:
+        _last_heartbeat = time.time()
+    return jsonify({"ok": True})
+
+
+def _watchdog_loop():
+    """Daemon-Thread: prueft alle 5s ob der Browser noch da ist."""
+    global _shutdown_started
+    while True:
+        time.sleep(5)
+        with _heartbeat_lock:
+            elapsed = time.time() - _last_heartbeat
+        if elapsed > HEARTBEAT_TIMEOUT and not _shutdown_started:
+            _shutdown_started = True
+            # Hard-Exit, damit alle Threads (inkl. Flask-Werkzeug) sicher
+            # mit-beendet werden. sys.exit waere Flask-werkzeug-eaten.
+            os._exit(0)
+
+
+# Watchdog nur im PyInstaller-Bundle starten, NICHT im Source-Mode /
+# bei Unit-Tests (sonst killen wir versehentlich Pytest-Runs).
+import sys as _sys
+if getattr(_sys, "frozen", False):
+    threading.Thread(target=_watchdog_loop, daemon=True).start()
 
 
 @app.route("/api/check-update")
