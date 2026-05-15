@@ -128,8 +128,12 @@ jobs:
           retention-days: 90
 
   # ── Publish: version.json + Binaries auf die Schul-Homepage (nur bei Tag) ──
+  # Nur build-windows ist Pflicht — macOS-Runner stehen oft lange in der Queue
+  # und sollen den Auto-Update-Deploy nicht aufhalten. Wenn DMG vorhanden ist
+  # wird sie mit-hochgeladen, sonst bleibt der Mac-URL-Eintrag in version.json
+  # auf einen kuenftigen Build verweisen.
   publish:
-    needs: [build-macos, build-windows]
+    needs: [build-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -164,10 +168,20 @@ jobs:
         run: |
           EXE=$(find artifacts -name '*.exe' | head -1)
           DMG=$(find artifacts -name '*.dmg' | head -1)
-          if [ -z "$EXE" ] || [ -z "$DMG" ]; then
-            echo "::error::EXE oder DMG nicht in den Artefakten gefunden"; exit 1
+          if [ -z "$EXE" ]; then
+            echo "::error::EXE nicht in den Artefakten gefunden"; exit 1
           fi
-          for f in "$EXE" "$DMG" version.json; do
+          if [ -z "$DMG" ]; then
+            echo "::warning::DMG fehlt — nur EXE + version.json werden hochgeladen"
+          fi
+          # Binaries zuerst, version.json zuletzt — Clients sehen nie eine
+          # version.json, die auf noch-nicht-hochgeladene Dateien zeigt.
+          UPLOAD_LIST=("$EXE")
+          if [ -n "$DMG" ]; then
+            UPLOAD_LIST+=("$DMG")
+          fi
+          UPLOAD_LIST+=("version.json")
+          for f in "${UPLOAD_LIST[@]}"; do
             echo "Lade hoch: $f"
             curl --fail --silent --show-error --ftp-create-dirs \
                  --user "$FTP_USER:$FTP_PASS" \

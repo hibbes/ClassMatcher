@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.5"
+APP_VERSION = "1.6.6"
 
 app = Flask(__name__, static_folder="static")
 
@@ -82,6 +82,15 @@ def _apply_class_names(classes: list) -> None:
             cls["name"] = _state["class_names"][cls["id"]]
         elif cls["id"] in defaults:
             cls["name"] = defaults[cls["id"]]
+
+
+def _sort_klasse5_classes(classes: list) -> list:
+    """Modus 5: Klassen alphabetisch nach Namen sortieren, damit
+    5a (Musikteile) / 5b (Musikteile) / 5c (Bili) / 5d (Französisch)
+    in dieser Reihenfolge erscheinen. Bei Modus 8 unveraendert."""
+    if _state["mode"] != "klasse5":
+        return classes
+    return sorted(classes, key=lambda c: (c.get("name") or c["id"]).lower())
 
 
 def _klasse5_role_names(classes: list) -> dict:
@@ -439,6 +448,7 @@ def assign():
             }
             for cls in classes
         ]
+        response_classes = _sort_klasse5_classes(response_classes)
 
         _attach_wish_info(response_classes, sm)
 
@@ -503,6 +513,7 @@ def refine_friends():
              "students": [sm[sid] for sid in cls["students"] if sid in sm]}
             for cls in classes
         ]
+        response_classes = _sort_klasse5_classes(response_classes)
         _attach_wish_info(response_classes, sm)
         stats = calculate_stats(
             [{"id": c["id"], "students": [s["id"] for s in c["students"]]}
@@ -605,6 +616,7 @@ def load_state():
 
     # Klassenname aus class_names anwenden (analog zu assign())
     _apply_class_names(saved_classes)
+    saved_classes = _sort_klasse5_classes(saved_classes)
 
     _attach_wish_info(saved_classes, sm)
 
