@@ -202,9 +202,51 @@ function renderRules() {
     ? _buildRulesKlasse8()
     : _buildRulesKlasse5();
   content.innerHTML = "<ul>" + items.map(it =>
-    `<li class="${it.type}"><b>${it.title}</b>` +
-    `<span class="rule-detail">${it.detail}</span></li>`
+    `<li class="${it.type} rule-locked" tabindex="0">` +
+    `<span class="rule-lock" title="Diese Regel ist fest verankert">🔒</span>` +
+    `<div class="rule-body"><b>${it.title}</b>` +
+    `<span class="rule-detail">${it.detail}</span></div></li>`
   ).join("") + "</ul>";
+  for (const li of content.querySelectorAll("li.rule-locked")) {
+    li.addEventListener("click", _onLockedRuleClick);
+  }
+}
+
+// Easter-Egg: Klick auf eine verankerte Regel laesst einmal pro
+// Versions-Bump Goldmuenzen regnen + Jani-Toast oben. Nach einem
+// Auto-Update ist das Easter-Egg wieder freigeschaltet.
+const EE_STORAGE_KEY = "classmatcher_easteregg_seen_in_version";
+function _onLockedRuleClick() {
+  const v = state.appVersion;
+  if (!v) return;
+  let seenIn = null;
+  try { seenIn = localStorage.getItem(EE_STORAGE_KEY); } catch { /* private mode */ }
+  if (seenIn === v) return;
+  try { localStorage.setItem(EE_STORAGE_KEY, v); } catch { /* private mode */ }
+  _spawnGoldenCoins(12);
+  _showJaniToast();
+}
+
+function _spawnGoldenCoins(n) {
+  for (let i = 0; i < n; i++) {
+    const coin = document.createElement("div");
+    coin.className = "ee-coin";
+    coin.textContent = "🪙";
+    coin.style.left = (Math.random() * 90 + 5) + "vw";
+    coin.style.animationDelay = (Math.random() * 0.6) + "s";
+    coin.style.animationDuration = (1.4 + Math.random() * 1.0) + "s";
+    coin.style.fontSize = (22 + Math.floor(Math.random() * 14)) + "px";
+    document.body.appendChild(coin);
+    setTimeout(() => coin.remove(), 3000);
+  }
+}
+
+function _showJaniToast() {
+  const toast = document.createElement("div");
+  toast.className = "ee-toast";
+  toast.innerHTML = "🏆 Jani hat eine Schatzkiste gefunden!";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2600);
 }
 
 function _buildRulesKlasse5() {
@@ -1185,6 +1227,7 @@ async function init() {
     .then(d => {
       const el = document.getElementById("app-version");
       if (el && d.version) el.textContent = "v" + d.version;
+      if (d.version) state.appVersion = d.version;
     })
     .catch(() => {});
 
