@@ -25,6 +25,10 @@ const state = {
     weightProfileCluster:   50,
     multiStart:              5,
     autoRefine:              2,
+    // Toggleable Regeln im rechten Regel-Panel — Default true (opt-out)
+    enforceMinOneWish:    true,
+    enforceMusikMaxTwo:   true,
+    forceBiliSingleClass: false,  // Klasse 8 Checkbox, Default off
   },
   view:           "upload",  // "upload" | "loading" | "board"
   dragStudentId:  null,
