@@ -43,6 +43,103 @@ def _wait_for_server(timeout: int = 15) -> bool:
     return False
 
 
+def _try_bind_port() -> bool:
+    """True wenn PORT aktuell frei und sofort gebindet werden koennte."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", PORT))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def _pid_on_port():
+    """PID, der PORT belegt — oder None. Plattform-Heuristik."""
+    try:
+        if SYSTEM in ("Darwin", "Linux"):
+            out = subprocess.run(
+                ["lsof", "-nP", f"-iTCP:{PORT}", "-sTCP:LISTEN", "-t"],
+                capture_output=True, text=True, timeout=3,
+            )
+            pids = [int(x) for x in out.stdout.strip().splitlines() if x.strip().isdigit()]
+            return pids[0] if pids else None
+        if SYSTEM == "Windows":
+            out = subprocess.run(
+                ["netstat", "-ano", "-p", "tcp"],
+                capture_output=True, text=True, timeout=3,
+            )
+            for line in out.stdout.splitlines():
+                if f":{PORT}" in line and "LISTENING" in line.upper():
+                    parts = line.split()
+                    if parts and parts[-1].isdigit():
+                        return int(parts[-1])
+    except Exception:
+        pass
+    return None
+
+
+def _process_is_own(pid: int) -> bool:
+    """True wenn PID nach 'Schiller-Klassen-Mixer' aussieht — Pythonsuffix
+    auch (Dev-Mode), damit ein vergessener python launcher.py erkannt wird."""
+    try:
+        if SYSTEM in ("Darwin", "Linux"):
+            out = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True, text=True, timeout=2,
+            )
+            txt = out.stdout.lower()
+            return ("klassen-mixer" in txt
+                    or "schiller-klassen-mixer" in txt
+                    or "launcher.py" in txt)
+        if SYSTEM == "Windows":
+            out = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=2,
+            )
+            return "klassen-mixer" in out.stdout.lower()
+    except Exception:
+        pass
+    return False
+
+
+def _kill_pid(pid: int):
+    try:
+        if SYSTEM == "Windows":
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                           capture_output=True, timeout=3)
+        else:
+            os.kill(pid, 9)
+    except Exception:
+        pass
+
+
+def _ensure_port_free():
+    """Sorgt dafuer, dass PORT frei ist. Returns (ok, reason).
+    ok=False mit reason!='' = Konflikt mit fremdem Prozess (User informieren).
+    ok=True = Port jetzt frei. Eigene alte Instanz wurde ggf. gekillt."""
+    if _try_bind_port():
+        return True, ""
+    pid = _pid_on_port()
+    if pid is None:
+        # Port belegt, aber kein PID ermittelbar — Best-Effort: 1s warten,
+        # nochmal probieren (OS-Cleanup nach Crash kann ein paar Sek dauern).
+        time.sleep(1.0)
+        if _try_bind_port():
+            return True, ""
+        return False, f"Port {PORT} ist belegt (Prozess unbekannt)."
+    if _process_is_own(pid):
+        _kill_pid(pid)
+        for _ in range(20):  # bis zu 4s warten
+            time.sleep(0.2)
+            if _try_bind_port():
+                return True, ""
+        return False, f"Alte Instanz (PID {pid}) liess sich nicht beenden."
+    return False, (f"Port {PORT} ist von einem fremden Programm belegt "
+                   f"(PID {pid}). Bitte schliesse es und starte neu.")
+
+
 def _notify(msg: str):
     """Kurze System-Benachrichtigung (nicht-blockierend, optional)."""
     try:
@@ -85,6 +182,13 @@ if __name__ == "__main__":
         _update.cleanup_old_exe()
     except Exception:
         pass
+
+    # Pre-Launch: sicherstellen, dass Port frei ist. Alte eigene Instanzen
+    # werden automatisch gekillt; fremde Prozesse meldet der Alert.
+    ok, reason = _ensure_port_free()
+    if not ok:
+        _alert("Startfehler", reason)
+        sys.exit(1)
 
     # Flask-Server im Daemon-Thread starten
     threading.Thread(target=_run_flask, daemon=True).start()

@@ -188,10 +188,31 @@ function showView(v) {
   document.getElementById("btn-clear-locks").classList.toggle("hidden", !afterUpload);
   document.getElementById("btn-save").classList.toggle("hidden", !afterUpload);
   document.getElementById("btn-print").classList.toggle("hidden", !afterUpload);
+  document.getElementById("btn-back-to-start").classList.toggle("hidden", !afterUpload);
   document.getElementById("sidebar").classList.toggle("hidden", !afterUpload);
   const rulesPanel = document.getElementById("rules-panel");
   if (rulesPanel) rulesPanel.classList.toggle("hidden", !afterUpload);
   if (afterUpload) renderRules();
+}
+
+// Zurueck-zur-Startseite: setzt das Board-State zurueck, behaelt Mode (5/8)
+// und Parameter — User landet wieder auf der CSV-Auswahl.
+function backToStart() {
+  const hasData = (state.classes || []).length > 0
+                  || (state.students || []).length > 0;
+  if (hasData) {
+    const ok = confirm("Aktuelle Klassenverteilung verwerfen und zurueck zur Startseite?");
+    if (!ok) return;
+  }
+  state.students       = [];
+  state.classes        = [];
+  state.stats          = [];
+  state.pendingWishes  = [];
+  state.dontBeWith     = [];
+  state.lockedStudents = {};
+  updateFuzzyBadge(0);
+  updateSubtitle("Klassen-Zuweisung");
+  showView("upload");
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -1326,6 +1347,9 @@ async function init() {
     dropZone.classList.remove("dragover");
     handleFile(e.dataTransfer.files[0]);
   });
+
+  // ── Zurueck zur Startseite ───────────────────────────────
+  document.getElementById("btn-back-to-start").addEventListener("click", backToStart);
 
   // ── Neu zuweisen ─────────────────────────────────────────
   document.getElementById("btn-reassign").addEventListener("click", () => doAssign());
