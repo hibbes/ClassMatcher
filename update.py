@@ -13,9 +13,21 @@ bewusst in der Flask-Route, damit dieses Modul rein + testbar bleibt.
 import json
 import platform
 import shutil
+import ssl
 import sys
 import urllib.request
 from pathlib import Path
+
+# certifi bundlet ein Mozilla-CA-Bundle und ist Pflicht im PyInstaller-Build:
+# der gebuendelte Python hat sonst keine erreichbaren System-CAs (auf Mac/Win
+# greift PyInstaller die Plattform-Trust-Stores nicht automatisch ab), und
+# HTTPS-Requests scheitern still mit CERTIFICATE_VERIFY_FAILED. Im Source-
+# Mode ohne installiertes certifi fallen wir auf den System-Default zurueck.
+try:
+    import certifi
+    _CA_FILE = certifi.where()
+except Exception:
+    _CA_FILE = None
 
 # Wichtig: `www.`-Subdomain verwenden, sonst macht Mittwald 301 von
 # https://schiller-offenburg.de/... auf http://www.schiller-offenburg.de/...
@@ -52,12 +64,21 @@ def _parse_version(s) -> tuple:
 
 
 def _opener(cfg: dict):
-    """urllib-Opener: expliziter Proxy aus der Config, sonst System-Proxy
-    (ProxyHandler() ohne Args nutzt urllib.request.getproxies())."""
+    """urllib-Opener mit explizitem CA-Bundle + Proxy-Behandlung.
+
+    SSL-Context nutzt certifi's CA-Bundle (sofern verfuegbar), damit
+    HTTPS-Verifizierung im PyInstaller-Bundle funktioniert. Proxy
+    kommt aus der Config oder vom System (ProxyHandler() ohne Args
+    nutzt urllib.request.getproxies())."""
+    if _CA_FILE:
+        ctx = ssl.create_default_context(cafile=_CA_FILE)
+    else:
+        ctx = ssl.create_default_context()
+    https_handler = urllib.request.HTTPSHandler(context=ctx)
     proxy = cfg.get("proxy")
-    handler = (urllib.request.ProxyHandler({"http": proxy, "https": proxy})
-               if proxy else urllib.request.ProxyHandler())
-    return urllib.request.build_opener(handler)
+    proxy_handler = (urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+                     if proxy else urllib.request.ProxyHandler())
+    return urllib.request.build_opener(proxy_handler, https_handler)
 
 
 def _fetch_manifest(cfg: dict) -> dict:

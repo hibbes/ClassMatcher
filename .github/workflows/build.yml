@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
 
       - name: Abhängigkeiten installieren
-        run: pip install flask pyinstaller pillow
+        run: pip install flask pyinstaller pillow certifi
 
       - name: App-Version auslesen
         id: ver
@@ -53,6 +53,7 @@ jobs:
             --add-data "app.py:." \
             --add-data "matcher.py:." \
             --add-data "update.py:." \
+            --collect-data certifi \
             launcher.py
 
       - name: DMG erstellen
@@ -90,7 +91,7 @@ jobs:
           python-version: "3.12"
 
       - name: Abhängigkeiten installieren
-        run: pip install flask pyinstaller pillow
+        run: pip install flask pyinstaller pillow certifi
 
       - name: App-Version auslesen
         id: ver
@@ -125,6 +126,7 @@ jobs:
             --add-data "app.py;." `
             --add-data "matcher.py;." `
             --add-data "update.py;." `
+            --collect-data certifi `
             launcher.py
 
       - name: EXE hochladen
@@ -140,8 +142,15 @@ jobs:
   # wird sie mit-hochgeladen, sonst bleibt der Mac-URL-Eintrag in version.json
   # auf einen kuenftigen Build verweisen.
   publish:
-    needs: [build-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    # build-windows ist Pflicht (EXE muss da sein); build-macos wird abgewartet
+    # damit die DMG nicht in einer Race-Condition fehlt — wenn macOS-Build
+    # ausfaellt, laeuft publish trotzdem mit einer Warning weiter (DMG-Step
+    # ist optional, siehe Upload-Logik unten).
+    needs: [build-windows, build-macos]
+    if: |
+      always() &&
+      needs.build-windows.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Version aus Tag ableiten
