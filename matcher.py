@@ -480,6 +480,38 @@ def optimize_mixed_assignment(
         if sid in sid2cls:
             music_per_class[sid2cls[sid]] += 1
 
+    # Per-Schueler "Anzahl eigene Wuensche erfuellt" + unmet_count
+    # (Schueler mit Wuenschen aber 0 davon erfuellt). Wird in _score() mit
+    # UNMET_PENALTY bestraft, damit "jeder kriegt mind. 1 Wunsch, wenn moeglich"
+    # vor "manche kriegen mehr Wuensche" praeferiert wird.
+    out_fulfilled: dict = {}
+    for _sid, _friends in resolved_wishes.items():
+        if not _friends or _sid not in sid2cls:
+            continue
+        out_fulfilled[_sid] = sum(
+            1 for _fid in _friends if sid2cls.get(_fid) == sid2cls[_sid]
+        )
+    unmet_count = sum(1 for v in out_fulfilled.values() if v == 0)
+
+    def _refresh_out_fulfilled(wishers) -> None:
+        """Recompute out_fulfilled fuer betroffene Wuenscher + unmet_count."""
+        nonlocal unmet_count
+        for w in wishers:
+            if w not in out_fulfilled:
+                continue
+            old = out_fulfilled[w]
+            new = sum(
+                1 for _fid in resolved_wishes.get(w, ())
+                if sid2cls.get(_fid) == sid2cls.get(w)
+            )
+            if old == new:
+                continue
+            out_fulfilled[w] = new
+            if old == 0 and new > 0:
+                unmet_count -= 1
+            elif old > 0 and new == 0:
+                unmet_count += 1
+
     def _score() -> float:
         sc = 0.0
         if w_friend > 0:
@@ -490,6 +522,7 @@ def optimize_mixed_assignment(
             if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
                 vio += 1
         sc -= 10_000 * vio
+        sc -= 1_000 * unmet_count    # Jeder mit Wuenschen soll mind. 1 erfuellt haben
         if w_gender > 0:
             for cid in class_ids:
                 boys, girls = gender_counts[cid]
@@ -580,11 +613,13 @@ def optimize_mixed_assignment(
             z_asgn[c3][i3] = sid2
             old_friend = friend_count
             pairs  = _affected_pairs((sid1, sid2, sid3), resolved_wishes, who_wishes_for)
+            wishers = {w for w, _ in pairs}
             before = _fulfilled_in(pairs, sid2cls)
             _move(sid1, c1, c2)
             _move(sid2, c2, c3)
             _move(sid3, c3, c1)
             friend_count = old_friend + _fulfilled_in(pairs, sid2cls) - before
+            _refresh_out_fulfilled(wishers)
             new_score = _score()
             delta     = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
@@ -598,6 +633,7 @@ def optimize_mixed_assignment(
                 _move(sid2, c3, c2)
                 _move(sid3, c1, c3)
                 friend_count = old_friend
+                _refresh_out_fulfilled(wishers)
         else:
             c1, c2 = random.sample(class_ids, 2)
             pool1  = free_pos[c1]
@@ -617,10 +653,12 @@ def optimize_mixed_assignment(
 
             old_friend = friend_count
             pairs  = _affected_pairs((sid1, sid2), resolved_wishes, who_wishes_for)
+            wishers = {w for w, _ in pairs}
             before = _fulfilled_in(pairs, sid2cls)
             _move(sid1, c1, c2)
             _move(sid2, c2, c1)
             friend_count = old_friend + _fulfilled_in(pairs, sid2cls) - before
+            _refresh_out_fulfilled(wishers)
             new_score = _score()
             delta     = new_score - cur_score
 
@@ -634,6 +672,7 @@ def optimize_mixed_assignment(
                 _move(sid1, c2, c1)
                 _move(sid2, c1, c2)
                 friend_count = old_friend
+                _refresh_out_fulfilled(wishers)
 
         T = max(T_min, T * cool)
 
@@ -889,9 +928,9 @@ def refine_friends_klasse5(
         return f
 
     # ── Delta-Scoring-Setup ──────────────────────────────────────
-    # Score = fulfilled_count * 1.0 - violation_count * 1_000_000.
-    # fulfilled_count wird inkrementell pro Swap mitgefuehrt, statt pro
-    # Iteration alle Wuensche neu zu zaehlen (war der O(n)-Hotspot).
+    # Score = fulfilled_count - 1_000_000 * violations - 1_000 * unmet_count.
+    # fulfilled_count + unmet_count werden inkrementell pro Swap mitgefuehrt,
+    # statt pro Iteration alle Wuensche neu zu zaehlen.
     who_wishes_for: dict = defaultdict(list)
     for _w_sid, _w_friends in resolved_wishes.items():
         for _w_fid in _w_friends:
@@ -910,7 +949,40 @@ def refine_friends_klasse5(
             if sid2cls.get(fid) == sid2cls[sid]:
                 friend_count += 1
 
-    cur_score  = float(friend_count - 1_000_000 * _count_violations(sid2cls, dont_be_with))
+    # Per-Schueler "Anzahl eigene Wuensche erfuellt" + unmet_count
+    out_fulfilled: dict = {}
+    for _sid, _friends in resolved_wishes.items():
+        if not _friends or _sid not in sid2cls:
+            continue
+        out_fulfilled[_sid] = sum(
+            1 for _fid in _friends if sid2cls.get(_fid) == sid2cls[_sid]
+        )
+    unmet_count = sum(1 for v in out_fulfilled.values() if v == 0)
+
+    def _refresh_out_fulfilled(wishers) -> None:
+        nonlocal unmet_count
+        for w in wishers:
+            if w not in out_fulfilled:
+                continue
+            old = out_fulfilled[w]
+            new = sum(
+                1 for _fid in resolved_wishes.get(w, ())
+                if sid2cls.get(_fid) == sid2cls.get(w)
+            )
+            if old == new:
+                continue
+            out_fulfilled[w] = new
+            if old == 0 and new > 0:
+                unmet_count -= 1
+            elif old > 0 and new == 0:
+                unmet_count += 1
+
+    def _full_score(fc: int) -> float:
+        return float(fc
+                     - 1_000_000 * _count_violations(sid2cls, dont_be_with)
+                     - 1_000 * unmet_count)
+
+    cur_score  = _full_score(friend_count)
     best_asgn  = {k: list(v) for k, v in asgn.items()}
     best_score = cur_score
 
@@ -944,10 +1016,12 @@ def refine_friends_klasse5(
             asgn[c2][i2] = sid1
             asgn[c3][i3] = sid2
             pairs  = _affected_pairs((sid1, sid2, sid3), resolved_wishes, who_wishes_for)
+            wishers = {w for w, _ in pairs}
             before = _fulfilled_in(pairs, sid2cls)
             sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c2, c3, c1
             new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
-            new_score  = float(new_friend - 1_000_000 * _count_violations(sid2cls, dont_be_with))
+            _refresh_out_fulfilled(wishers)
+            new_score  = _full_score(new_friend)
             delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -958,6 +1032,7 @@ def refine_friends_klasse5(
             else:
                 asgn[c1][i1], asgn[c2][i2], asgn[c3][i3] = sid1, sid2, sid3
                 sid2cls[sid1], sid2cls[sid2], sid2cls[sid3] = c1, c2, c3
+                _refresh_out_fulfilled(wishers)
         else:
             c1, c2 = random.sample(class_ids, 2)
             p1 = free_pos[c1]
@@ -972,10 +1047,12 @@ def refine_friends_klasse5(
                 continue
             asgn[c1][i1], asgn[c2][i2] = sid2, sid1
             pairs  = _affected_pairs((sid1, sid2), resolved_wishes, who_wishes_for)
+            wishers = {w for w, _ in pairs}
             before = _fulfilled_in(pairs, sid2cls)
             sid2cls[sid1], sid2cls[sid2] = c2, c1
             new_friend = friend_count + _fulfilled_in(pairs, sid2cls) - before
-            new_score  = float(new_friend - 1_000_000 * _count_violations(sid2cls, dont_be_with))
+            _refresh_out_fulfilled(wishers)
+            new_score  = _full_score(new_friend)
             delta      = new_score - cur_score
             if delta > 0 or random.random() < math.exp(max(-700, delta / T)):
                 cur_score = new_score
@@ -986,6 +1063,7 @@ def refine_friends_klasse5(
             else:
                 asgn[c1][i1], asgn[c2][i2] = sid1, sid2
                 sid2cls[sid1], sid2cls[sid2] = c1, c2
+                _refresh_out_fulfilled(wishers)
 
         T = max(T_min, T * cool)
 

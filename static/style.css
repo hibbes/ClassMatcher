@@ -552,6 +552,15 @@ html, body {
 .badge-ru-kein  { background: #f8fafc; color: #94a3b8; }
 .badge-ru-other { background: #f1f5f9; color: #475569; }
 
+/* ─ Zero-Wish: kein einziger Freundeswunsch erfuellt ─ */
+.student-card.zero-wish {
+  border-left: 3px solid #ef4444;
+  background: #fef2f2;
+}
+.student-card.zero-wish .student-name {
+  color: #991b1b;
+}
+
 /* ─ Profil- und Zug-Badges für Klasse 8 ─ */
 .badge-bili    { background: #cffafe; color: #0e7490; }
 .badge-musik   { background: #fce7f3; color: #be185d; }

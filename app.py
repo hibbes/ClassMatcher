@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.3"
+APP_VERSION = "1.6.4"
 
 app = Flask(__name__, static_folder="static")
 
@@ -67,16 +67,63 @@ def _pending_count() -> int:
 
 
 def _apply_class_names(classes: list) -> None:
-    """Klassennamen setzen: manuelle Umbenennung gewinnt, sonst Standard-Default."""
+    """Klassennamen setzen: manuelle Umbenennung gewinnt, sonst Rollen-Default.
+
+    Modus 5 (4 Klassen):  Musik-Klassen → 5a/5b (Musikteile),
+                          Bili-Klasse → 5c (Bili),
+                          Lateinfreie Klasse → 5d (Französisch).
+    """
     if _state["mode"] == "klasse8":
         defaults = {cls["id"]: cls["id"].upper() for cls in classes}
     else:
-        defaults = {"5y": "Bili-Klasse"}
+        defaults = _klasse5_role_names(classes)
     for cls in classes:
         if cls["id"] in _state["class_names"]:
             cls["name"] = _state["class_names"][cls["id"]]
         elif cls["id"] in defaults:
             cls["name"] = defaults[cls["id"]]
+
+
+def _klasse5_role_names(classes: list) -> dict:
+    """Default-Namen anhand der Klassen-Rollen ableiten (Modus 5)."""
+    student_map = {s["id"]: s for s in _state["students"]}
+    music_per_cls: dict = {}
+    has_bili: dict = {}
+    has_latin: dict = {}
+    for cls in classes:
+        sids = cls.get("students", [])
+        music_per_cls[cls["id"]] = sum(
+            1 for sid in sids if student_map.get(sid, {}).get("profil") == "5x"
+        )
+        has_bili[cls["id"]] = any(
+            student_map.get(sid, {}).get("profil") == "5y" for sid in sids
+        )
+        has_latin[cls["id"]] = any(
+            student_map.get(sid, {}).get("fremdsprache2") == "L" for sid in sids
+        )
+
+    bili_id = next((cid for cid, b in has_bili.items() if b), None)
+    music_ids = sorted(
+        [cid for cid, n in music_per_cls.items() if n > 0 and cid != bili_id],
+        key=lambda c: (-music_per_cls[c], c),
+    )[:2]
+    latin_free_id = next(
+        (cls["id"] for cls in classes
+         if cls["id"] != bili_id
+         and cls["id"] not in music_ids
+         and not has_latin[cls["id"]]),
+        None,
+    )
+
+    names: dict = {}
+    music_labels = ["5a (Musikteile)", "5b (Musikteile)"]
+    for i, cid in enumerate(music_ids):
+        names[cid] = music_labels[i]
+    if bili_id:
+        names[bili_id] = "5c (Bili)"
+    if latin_free_id:
+        names[latin_free_id] = "5d (Französisch)"
+    return names
 
 
 # ──────────────────────────────────────────────────────────────────────────────

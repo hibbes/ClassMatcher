@@ -357,10 +357,27 @@ function buildWishHtml(wishInfo) {
       return `<span class="wish-tag wish-ok" title="Wunsch erfüllt">✓ ${w.friendName}</span>`;
     } else {
       const cls = w.friendClass ? ` → ${w.friendClass}` : "";
-      return `<span class="wish-tag wish-miss" title="Wunsch nicht erfüllt">✗ ${w.friendName}${cls}</span>`;
+      const reason = w.reason ? `\n${w.reason}` : "";
+      const tip = `Wunsch nicht erfüllt${reason}`;
+      return `<span class="wish-tag wish-miss" title="${escapeAttr(tip)}">✗ ${w.friendName}${cls}</span>`;
     }
   });
   return `<div class="wish-row">${parts.join("")}</div>`;
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function buildZeroWishTooltip(wishInfo) {
+  // Tooltip-Text fuer Schueler ohne erfuellten Wunsch.
+  if (!wishInfo || wishInfo.length === 0) return "";
+  const lines = wishInfo
+    .filter(w => !w.fulfilled)
+    .map(w => `✗ ${w.friendName}${w.friendClass ? ` → ${w.friendClass}` : ""}` +
+              (w.reason ? `\n   ${w.reason}` : ""));
+  if (lines.length === 0) return "";
+  return "Kein Freundeswunsch erfüllt:\n" + lines.join("\n");
 }
 
 function renderStudentCard(student, classId) {
@@ -372,6 +389,17 @@ function renderStudentCard(student, classId) {
 
   const locked = !!state.lockedStudents[student.id];
   if (locked) card.classList.add("locked");
+
+  // Zero-Wish-Markierung: SuS mit Wuenschen aber 0 erfuellt rot umranden +
+  // Card-Tooltip mit allen Gruenden zeigen.
+  const wishes = student.wishInfo || [];
+  const hasWishes = wishes.length > 0;
+  const noFulfilled = hasWishes && wishes.every(w => !w.fulfilled);
+  if (noFulfilled) {
+    card.classList.add("zero-wish");
+    const tip = buildZeroWishTooltip(wishes);
+    if (tip) card.title = tip;
+  }
 
   const gClass = student.geschlecht === "m" ? "m"
                : student.geschlecht === "w" ? "w" : "x";
