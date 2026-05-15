@@ -145,7 +145,11 @@ def upload():
         return jsonify({"error": f"Unbekannter Modus: {mode}"}), 400
 
     try:
-        content = f.read().decode("utf-8-sig")
+        raw = f.read()
+        try:
+            content = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            content = raw.decode("cp1252")
         if mode == "klasse8":
             students = parse_csv_klasse8(content)
         else:
