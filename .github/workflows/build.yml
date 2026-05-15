@@ -186,6 +186,6 @@ jobs:
             curl --fail --silent --show-error --ftp-create-dirs \
                  --user "$FTP_USER:$FTP_PASS" \
                  --upload-file "$f" \
-                 "ftp://$FTP_HOST/classmatcher/$(basename "$f")"
+                 "ftp://$FTP_HOST/html/classmatcher/$(basename "$f")"
           done
           echo "Publish fertig: version.json $(grep -o '\"version\"[^,]*' version.json)"
