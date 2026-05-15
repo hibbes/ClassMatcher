@@ -298,6 +298,8 @@ function renderClassCol(cls) {
 const TRACK_LABELS = { "5x": "Musik", "5y": "Bili", "5z": "Normal" };
 const PROFIL_LONG  = { "5x": "Musikzug", "5y": "Bili-Klasse", "5z": "Normalzug" };
 const LANG_LABELS  = { "F": "Franzö.", "L": "Latein" };
+const RU_LABELS    = { "RK": "Reli K", "EV": "Reli Ev", "Ethik": "Ethik", "KEIN": "Kein RU", "K_A": "K. Angabe" };
+const RU_CLASS     = { "RK": "rk", "EV": "ev", "Ethik": "eth", "KEIN": "kein", "K_A": "kein" };
 
 const PROFIL8_SHORT = {
   "Naturwissenschaft und Technik (NWT)": "NWT",
@@ -333,13 +335,19 @@ function buildBadgesHtml(student) {
   const trackLabel = TRACK_LABELS[track] || track;
   const lang      = student.fremdsprache2 || "";
   const langLabel = LANG_LABELS[lang] || lang;
+  const ru        = student.ru || "";
+  const ruLabel   = RU_LABELS[ru] || ru;
+  const ruCls     = RU_CLASS[ru]  || "other";
 
   const trackBadge = `<span class="badge badge-${track}">${trackLabel}</span>`;
   const langBadge  = lang
     ? `<span class="badge badge-${lang}">${langLabel}</span>`
     : "";
+  const ruBadge    = ru
+    ? `<span class="badge badge-ru-${ruCls}" title="Religionsunterricht: ${ru}">${ruLabel}</span>`
+    : "";
 
-  return `<div class="card-badges">${trackBadge}${langBadge}</div>`;
+  return `<div class="card-badges">${trackBadge}${langBadge}${ruBadge}</div>`;
 }
 
 function buildWishHtml(wishInfo) {
@@ -804,6 +812,9 @@ function buildPrintView() {
                   : s.fremdsprache2 === "L" ? "Latein"
                   : s.fremdsprache2 || "–";
       }
+      const ruLabel = state.mode === "klasse8"
+        ? ""
+        : (RU_LABELS[s.ru] || s.ru || "–");
 
       // Wunschfreunde: erfüllt und nicht erfüllt (mit Trennungsgrund)
       const wishes = (s.wishInfo || []);
@@ -824,6 +835,10 @@ function buildPrintView() {
         ? `${s.name}, ${s.vorname}`
         : `${s.name}, ${s.rufname || s.vorname}`;
 
+      const ruCell = state.mode === "klasse8"
+        ? ""
+        : `<td class="pt-ru">${ruLabel}</td>`;
+
       return `
         <tr>
           <td class="pt-num">${i + 1}.</td>
@@ -832,6 +847,7 @@ function buildPrintView() {
           </td>
           <td class="pt-zug">${zugLabel}</td>
           <td class="pt-lang">${langLabel}</td>
+          ${ruCell}
           ${wishCell}
         </tr>`;
     }).join("");
@@ -874,6 +890,7 @@ function buildPrintView() {
             <th>Name, Vorname</th>
             <th>${zugColTitle}</th>
             <th>2. Fremdsprache</th>
+            ${state.mode === "klasse8" ? "" : "<th>Religion</th>"}
             <th>Freundeswünsche</th>
           </tr>
         </thead>

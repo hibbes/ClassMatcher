@@ -66,6 +66,8 @@ def parse_csv(content: str) -> list:
             "abgebendeSchule":(row.get("AbgebendeSchule") or "").strip(),
             "geburtsdatum":   (row.get("Geburtstag") or "").strip(),
             "fremdsprache2":  (row.get("Fremdsprache2") or "").strip().upper(),
+            "ru":             (row.get("RU") or "").strip(),
+            "religion":       (row.get("Religion") or "").strip(),
         })
 
     return students
@@ -361,8 +363,8 @@ def optimize_mixed_assignment(
 
     fill_students werden frei verschoben; fixed-Schüler (Bili) bleiben.
     Hard-Constraints: Latein-Schüler nie in latin_free_class,
-    Musikzug-Schüler nie in bili_class.
-    Soft-Constraint (gewichtet): Musikzug auf genau 2 Nicht-Bili-Klassen.
+    Musikzug-Schüler in höchstens zwei Nicht-Bili-Klassen.
+    Soft-Constraint (gewichtet): Musikzug innerhalb der 2 Targets ausbalancieren.
     """
     if not fill_students:
         return {cid: [] for cid in class_ids}
@@ -374,6 +376,16 @@ def optimize_mixed_assignment(
     # Latein-Status für schnellen Lookup
     is_latin = {s["id"]: s.get("fremdsprache2") == "L" for s in fill_students}
 
+    # Musik-Targets jetzt schon ermitteln, damit forbidden_for sie nutzen kann.
+    # Hard-Cap: Musikzug darf nur in diese (max 2) Klassen, alle anderen sind
+    # verboten. Auswahl: kapazitaetsstaerkste 2 Nicht-Bili-Klassen.
+    non_bili = [c for c in class_ids if c != bili_class]
+    non_lf   = [c for c in class_ids if c != latin_free_class]
+    non_both = [c for c in non_bili if c != latin_free_class]
+    _music_pool   = non_both if non_both else non_bili
+    music_targets = sorted(_music_pool, key=lambda c: -capacities.get(c, 0))[:2] or non_bili
+    music_targets_set = set(music_targets)
+
     _forbidden_cache: dict = {}
 
     def forbidden_for(sid: str) -> set:
@@ -383,8 +395,12 @@ def optimize_mixed_assignment(
         f = set()
         if latin_free_class and is_latin.get(sid):
             f.add(latin_free_class)
-        if bili_class and sid in music_ids:
-            f.add(bili_class)
+        if sid in music_ids:
+            # Hard: Musikzug ausschliesslich in den 2 gewaehlten Targets
+            # (bili_class ist per Auswahl-Logik nicht in music_targets_set).
+            for c in class_ids:
+                if c not in music_targets_set:
+                    f.add(c)
         _forbidden_cache[sid] = f
         return f
 
@@ -426,24 +442,13 @@ def optimize_mixed_assignment(
             if rounds > len(students) + len(allowed) + 1:
                 break
 
-    non_bili = [c for c in class_ids if c != bili_class]
-    non_lf   = [c for c in class_ids if c != latin_free_class]
-    non_both = [c for c in non_bili if c != latin_free_class]
+    # music_targets sind oben schon festgelegt (Hard-Cap auf 2 Klassen).
+    # ml_targets = Musik-Targets ohne die latein-freie Klasse, falls die zufaellig
+    # eines der Targets ist; sonst identisch.
+    ml_targets = [c for c in music_targets if c != latin_free_class] or music_targets
 
-    # Vorzugs-Targets für Musikzug: bei aktivem Slider die 2 kapazitätsstärksten
-    # Nicht-Bili-Klassen (bei kombinierten Constraints zusätzlich nicht latin_free).
-    if w_music_split > 0:
-        candidates = non_both if non_both else non_bili
-        music_targets = sorted(candidates, key=lambda c: -rem_cap.get(c, 0))[:2]
-        if not music_targets:
-            music_targets = non_bili
-        ml_targets = [c for c in music_targets if c != latin_free_class] or music_targets
-    else:
-        music_targets = non_bili
-        ml_targets    = non_both or non_bili
-
-    _place(music_latin, ml_targets)         # Musik + Latein: Bili AUS, lateinfrei AUS
-    _place(music_only,  music_targets)      # Musik: nur Bili AUS
+    _place(music_latin, ml_targets)         # Musik + Latein: nur Music-Targets, ohne lateinfrei
+    _place(music_only,  music_targets)      # Musik: nur Music-Targets
     _place(latin_only,  non_lf)             # Latein: nur lateinfrei AUS
     _place(rest,        class_ids)          # Rest: alle Klassen
 
