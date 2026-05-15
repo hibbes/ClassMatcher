@@ -822,10 +822,10 @@ def refine_friends_klasse5(
 
     Hard-Constraints bleiben:
       – Bili-SuS (Profil 5y) bleiben in ihrer Bili-Klasse (werden nicht bewegt)
-      – Musikzug-SuS (Profil 5x) niemals in Bili-Klasse
+      – Musikzug-SuS (Profil 5x) in maximal 2 Klassen (Hard-Cap, gleicher
+        Wert wie aus optimize_mixed_assignment, abgeleitet vom Input-Stand)
       – Latein-SuS niemals in der lateinfreien Klasse
     Locks bleiben fix. Klassengrößen ändern sich nicht.
-    Musikzug-Spread wird beim Refinement ignoriert.
     """
     locked      = locked_students or {}
     student_map = {s["id"]: s for s in students}
@@ -844,6 +844,17 @@ def refine_friends_klasse5(
     fill_cls_ids     = [c for c in class_ids if c != bili_class]
     latin_free_class = fill_cls_ids[-1] if len(fill_cls_ids) >= 2 else None
     is_latin = {s["id"]: s.get("fremdsprache2") == "L" for s in students}
+
+    # Music-Targets: die (bis zu) 2 Klassen, die aktuell Musikzug-SuS enthalten.
+    # Refinement darf Musik-SuS NUR zwischen diesen Klassen bewegen — die Bili-
+    # Klasse ist per Auswahl ausgeschlossen, alle anderen Nicht-Bili-Klassen
+    # werden ueber forbidden_for hart gesperrt.
+    _music_per_class: Counter = Counter()
+    for cid, sids in asgn.items():
+        for sid in sids:
+            if sid in music_ids:
+                _music_per_class[cid] += 1
+    music_targets_set = {c for c, _ in _music_per_class.most_common(2)}
 
     # Bili-Schüler sind fix in der Bili-Klasse – nicht bewegen
     bili_sids = {sid for cid in class_ids for sid in asgn[cid]
@@ -869,8 +880,11 @@ def refine_friends_klasse5(
         f: set = set()
         if latin_free_class and is_latin.get(sid):
             f.add(latin_free_class)
-        if bili_class and sid in music_ids:
-            f.add(bili_class)
+        if sid in music_ids:
+            # Hard: Musikzug ausschliesslich in den 2 aktuellen Music-Targets
+            for c in class_ids:
+                if c not in music_targets_set:
+                    f.add(c)
         _forbidden_cache[sid] = f
         return f
 
