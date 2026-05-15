@@ -185,6 +185,95 @@ function showView(v) {
   document.getElementById("btn-save").classList.toggle("hidden", !afterUpload);
   document.getElementById("btn-print").classList.toggle("hidden", !afterUpload);
   document.getElementById("sidebar").classList.toggle("hidden", !afterUpload);
+  const rulesPanel = document.getElementById("rules-panel");
+  if (rulesPanel) rulesPanel.classList.toggle("hidden", !afterUpload);
+  if (afterUpload) renderRules();
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Regel-Panel rechts: zeigt welche Regeln der Algorithmus aktuell
+// anwendet (live, abhängig von Modus + Parametern).
+// ──────────────────────────────────────────────────────────────────
+
+function renderRules() {
+  const content = document.getElementById("rules-content");
+  if (!content) return;
+  const items = state.mode === "klasse8"
+    ? _buildRulesKlasse8()
+    : _buildRulesKlasse5();
+  content.innerHTML = "<ul>" + items.map(it =>
+    `<li class="${it.type}"><b>${it.title}</b>` +
+    `<span class="rule-detail">${it.detail}</span></li>`
+  ).join("") + "</ul>";
+}
+
+function _buildRulesKlasse5() {
+  const p = state.params || {};
+  const items = [
+    { type: "hard", title: "Bili-Klasse (5c)",
+      detail: "Bili-Schüler:innen bleiben hier, Normalzug-SuS füllen auf." },
+    { type: "hard", title: "Musikzug auf 2 Klassen (5a + 5b)",
+      detail: "Musikzug-SuS landen nie in der Bili-Klasse, niemals verstreut über mehr als 2 Klassen." },
+    { type: "hard", title: "Französisch-Klasse (5d)",
+      detail: "Lateinfrei — Latein-SuS landen nie hier." },
+  ];
+  const dont = (state.dontBeWith || []).length;
+  if (dont > 0) {
+    items.push({ type: "hard",
+      title: `Nicht-zusammen (${dont} ${dont === 1 ? "Paar" : "Paare"})`,
+      detail: "Diese SuS landen niemals in derselben Klasse." });
+  }
+  items.push(
+    { type: "soft", title: "Mindestens 1 Wunsch pro SuS",
+      detail: "Falls möglich kriegt jede:r mit Wünschen mindestens einen erfüllt; rote Karten zeigen Ausnahmen." },
+    { type: "soft", title: `Freundeswünsche · Gewicht ${p.weightFriendWish ?? 0}/10`,
+      detail: "Höher = mehr erfüllte Wünsche zulasten anderer Kriterien." },
+    { type: "soft", title: `Geschlechterbalance · Gewicht ${p.weightGenderBalance ?? 0}/10`,
+      detail: "Höher = ausgeglicheneres m/w-Verhältnis pro Klasse." },
+    { type: "soft", title: `Musikzug-Verteilung · ${p.weightMusicSplit ?? 0}%`,
+      detail: "Wie streng 50/50 zwischen 5a und 5b balanciert wird. 0% = egal, 100% = exakt halbieren." },
+  );
+  return items;
+}
+
+function _buildRulesKlasse8() {
+  const p = state.params || {};
+  const items = [];
+  if (p.forceBiliSingleClass) {
+    items.push({ type: "hard", title: "Bili: genau 1 Klasse",
+      detail: "Checkbox aktiv — alle Bili-SuS in eine Klasse, auch wenn das maxSize sprengt." });
+  } else if (p.lateinMode === "musik_exception") {
+    items.push({ type: "hard", title: "Bili: max 2 Klassen",
+      detail: "Latein-Modus Musik-Ausnahme — Bili-SuS auf bis zu 2 Klassen verteilbar." });
+  } else {
+    items.push({ type: "hard", title: "Bili: max 1 oder 2 Klassen",
+      detail: "Strict-Modus: 1 Klasse wenn Musik-Latein-SuS existieren, sonst 2." });
+  }
+  items.push(
+    { type: "hard", title: "Latein: max 2 Klassen",
+      detail: "Bevorzugt die Bili-Klassen; ggf. wird die Musik-Klasse als zweite Latein-Klasse genutzt." },
+    { type: "hard", title: "Musik: eigene Klasse",
+      detail: "Musik-SuS landen alle in einer Klasse, klassendisjunkt zur Bili-Klasse." },
+    { type: "hard", title: "Verlasser & Nicht-Wähler",
+      detail: "SuS, die das Schiller verlassen oder kein Profil gewählt haben, gehen nicht in die Mischung." },
+  );
+  const dont = (state.dontBeWith || []).length;
+  if (dont > 0) {
+    items.push({ type: "hard",
+      title: `Nicht-zusammen (${dont} ${dont === 1 ? "Paar" : "Paare"})`,
+      detail: "Diese SuS landen niemals in derselben Klasse." });
+  }
+  items.push(
+    { type: "soft", title: "Mindestens 1 Wunsch pro SuS",
+      detail: "Falls möglich kriegt jede:r mit Wünschen mindestens einen erfüllt." },
+    { type: "soft", title: `Freundeswünsche · Gewicht ${p.weightFriendWish ?? 0}/10`,
+      detail: "Höher = mehr erfüllte Wünsche zulasten anderer Kriterien." },
+    { type: "soft", title: `Geschlechterbalance · Gewicht ${p.weightGenderBalance ?? 0}/10`,
+      detail: "Höher = ausgeglicheneres m/w-Verhältnis pro Klasse." },
+    { type: "soft", title: `Profile zusammenhalten · ${p.weightProfileCluster ?? 0}%`,
+      detail: "NWT, Spanisch und IMP bündeln. 0% = egal, 100% = strikt in wenigen Klassen." },
+  );
+  return items;
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -678,9 +767,11 @@ function renderDontBeWithList() {
       state.dontBeWith = state.dontBeWith.filter(p => !(p.a === a && p.b === b));
       await api.setDontBeWith(state.dontBeWith);
       renderDontBeWithList();
+      renderRules();
     });
     container.appendChild(item);
   }
+  renderRules();
 }
 
 function openPairModal() {
@@ -735,6 +826,7 @@ function setupStudentSearch(inputId, hiddenId, resultsId) {
 function setupParams() {
   const debouncedUpdate = debounce(async () => {
     await api.setParams(state.params);
+    renderRules();
     await doAssign();
   }, 600);
 
@@ -768,12 +860,23 @@ function setupParams() {
     });
   }
 
+  function bindCheckbox(id, key) {
+    const cb = document.getElementById(id);
+    if (!cb) return;
+    cb.checked = !!state.params[key];
+    cb.addEventListener("change", () => {
+      state.params[key] = !!cb.checked;
+      debouncedUpdate();
+    });
+  }
+
   bindSlider("p-maxSize", "maxClassSize",         "p-maxSize-val");
   bindSlider("p-minSize", "minClassSize",         "p-minSize-val");
   bindSlider("p-friend",  "weightFriendWish",     "p-friend-val");
   bindSlider("p-gender",  "weightGenderBalance",  "p-gender-val");
   bindSlider("p-music",   "weightMusicSplit",     "p-music-val", "%");
   bindSlider("p-profile", "weightProfileCluster", "p-profile-val", "%");
+  bindCheckbox("p-bili-single", "forceBiliSingleClass");
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -795,6 +898,7 @@ function applyModeUI() {
     const m = el.getAttribute("data-mode");
     el.classList.toggle("hidden", m !== state.mode);
   });
+  renderRules();
 }
 
 // ──────────────────────────────────────────────────────────────────

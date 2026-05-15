@@ -109,6 +109,10 @@
           <option value="100"></option>
         </datalist>
       </label>
+      <label data-mode="klasse8" class="checkbox-row" title="Erzwingt, dass ALLE Bili-Schüler:innen in genau eine Klasse kommen, statt auf bis zu zwei verteilt zu werden. Bei vielen Bili-SuS kann max_size überschritten werden.">
+        <input type="checkbox" id="p-bili-single" />
+        <span>Alle Bili-Schüler:innen in eine Klasse</span>
+      </label>
     </section>
 
     <section class="sidebar-section">
@@ -164,6 +168,18 @@
     </div>
 
   </div><!-- #content -->
+
+  <!-- ── Regel-Panel rechts ── -->
+  <aside id="rules-panel" class="hidden">
+    <h3>Aktive Regeln</h3>
+    <div id="rules-content">
+      <p class="rules-placeholder">Regeln werden sichtbar, sobald eine CSV geladen ist.</p>
+    </div>
+    <div class="rules-footer">
+      <small>So entscheidet der Algorithmus, wer wohin kommt.</small>
+    </div>
+  </aside>
+
 </main>
 
 <!-- ═══════════════════════ FUZZY MODAL ═════════════════════════ -->

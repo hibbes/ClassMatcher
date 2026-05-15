@@ -1848,6 +1848,7 @@ def _calculate_classes_klasse8_single(
     #                      Latein-Klasse mit nur den Musik-Latein-SuS).
     latein_mode      = params.get("lateinMode", "strict")
     force_num_cls    = params.get("forceNumClasses")
+    force_bili_one   = bool(params.get("forceBiliSingleClass", False))
 
     n = len(students)
     if n == 0:
@@ -1863,7 +1864,13 @@ def _calculate_classes_klasse8_single(
         if s.get("profil") == PROFIL_MUSIK and s.get("latein")
     )
 
-    if latein_mode == "musik_exception":
+    if force_bili_one:
+        # User-Checkbox: alle Bili-SuS hart in eine Klasse, egal wieviele.
+        # Bei zu vielen Bili-SuS sprengt das max_size; der Overflow-statt-
+        # Drop-Pfad in der SA-Optimierung faengt das ab (Klasse wird halt
+        # etwas voller, kein Schueler verschwindet).
+        max_bili_classes = 1
+    elif latein_mode == "musik_exception":
         # Klassisches Modus-5-Schema: 2 Bili-Klassen erlaubt; Musik-Latein
         # bleibt in der Musik-Klasse (siehe forbidden_for unten).
         max_bili_classes = 2

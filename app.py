@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.11"
+APP_VERSION = "1.6.12"
 
 app = Flask(__name__, static_folder="static")
 
@@ -49,6 +49,7 @@ _state: dict = {
         # Power-User-Parameter (kein UI-Regler) – via POST /api/params oder Speicherdatei:
         "lateinMode":       "strict",    # Modus klasse8: "strict" | "musik_exception"
         "forceNumClasses":      None,    # Modus klasse8: feste Klassenzahl statt Auto
+        "forceBiliSingleClass": False,   # Modus klasse8: alle Bili-SuS in genau einer Klasse
     },
 }
 
