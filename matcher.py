@@ -31,10 +31,16 @@ def normalize(name: str) -> str:
 # CSV-Parsing
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _detect_delimiter(content: str) -> str:
+    """Header-Heuristik: Schul-CSVs trennen mit ';', synthetische mit ','."""
+    first_line = content.split("\n", 1)[0]
+    return ";" if first_line.count(";") > first_line.count(",") else ","
+
+
 def parse_csv(content: str) -> list:
     """CSV-Inhalt parsen und Liste von Schüler-Dicts zurückgeben."""
     content = content.lstrip("\ufeff")  # BOM entfernen
-    reader = csv.DictReader(io.StringIO(content))
+    reader = csv.DictReader(io.StringIO(content), delimiter=_detect_delimiter(content))
     students = []
 
     for row in reader:
