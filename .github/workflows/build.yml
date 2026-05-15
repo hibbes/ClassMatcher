@@ -40,14 +40,17 @@ jobs:
           iconutil -c icns /tmp/AppIcon.iconset -o /tmp/AppIcon.icns
 
       - name: PyInstaller-Build
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          # App-Bundle-Name ist OHNE Versionsnummer, damit jede neue
+          # Installation in /Applications die alte ueberschreibt und
+          # nicht stapelweise alte Versionen liegen bleiben. Der
+          # DMG-Dateiname auf Mittwald behaelt die Version (cacheable,
+          # identifizierbar) — nur das App-Bundle innen ist versionslos.
           pyinstaller \
             --noconfirm \
             --onedir \
             --windowed \
-            --name "Schiller-Klassen-Mixer-v${VERSION}" \
+            --name "Schiller-Klassen-Mixer" \
             --icon /tmp/AppIcon.icns \
             --add-data "static:static" \
             --add-data "app.py:." \
@@ -60,12 +63,12 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          # Staging-Ordner: App + symbolischer Link auf /Applications
-          # (in Finder als "Programme" sichtbar), damit Nutzer:innen die
-          # App per Drag-and-Drop installieren koennen wie gewohnt.
+          # Staging-Ordner: App-Bundle (versionslos) + symbolischer Link
+          # auf /Applications (in Finder als "Programme" sichtbar), damit
+          # Nutzer:innen die App per Drag-and-Drop installieren koennen.
           rm -rf dmg-stage
           mkdir -p dmg-stage
-          cp -R "dist/Schiller-Klassen-Mixer-v${VERSION}.app" dmg-stage/
+          cp -R "dist/Schiller-Klassen-Mixer.app" dmg-stage/
           ln -s /Applications dmg-stage/Programme
           hdiutil create \
             -volname "Schiller-Klassen-Mixer v${VERSION}" \
@@ -113,14 +116,16 @@ jobs:
           "
 
       - name: PyInstaller-Build (Onefile, alles in einer EXE)
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          # EXE-Name OHNE Versionsnummer, damit auto-update den eigenen
+          # Speicherort sauber ueberschreibt und manuelle Re-Installs die
+          # alte Datei nicht stapeln. Versionierter Dateiname kommt erst
+          # beim Artifact-Upload + im Mittwald-URL.
           pyinstaller `
             --noconfirm `
             --onefile `
             --windowed `
-            --name "Schiller-Klassen-Mixer-v$env:VERSION" `
+            --name "Schiller-Klassen-Mixer" `
             --icon "static\logo.ico" `
             --add-data "static;static" `
             --add-data "app.py;." `
@@ -128,6 +133,12 @@ jobs:
             --add-data "update.py;." `
             --collect-data certifi `
             launcher.py
+
+      - name: EXE versionieren fuer Artifact
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          Copy-Item "dist\Schiller-Klassen-Mixer.exe" "dist\Schiller-Klassen-Mixer-v$env:VERSION.exe"
 
       - name: EXE hochladen
         uses: actions/upload-artifact@v4
