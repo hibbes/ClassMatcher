@@ -86,7 +86,17 @@ def check_for_update(current_version: str, *,
         manifest = _fetcher(cfg)
         latest = str(manifest["version"])
         url = manifest["mac_url" if platform.system() == "Darwin" else "win_url"]
-    except Exception:
+    except Exception as _e:
+        # Diagnose-Log (best-effort): nach /tmp/classmatcher-update.log; wird
+        # gebraucht solange Auto-Update auf manchen Schul-PCs noch nicht klappt.
+        try:
+            import traceback as _tb
+            with open("/tmp/classmatcher-update.log", "a") as _f:
+                _f.write(f"[check_for_update] {type(_e).__name__}: {_e}\n")
+                _f.write(_tb.format_exc())
+                _f.write("---\n")
+        except Exception:
+            pass
         return result  # offline, Proxy, 404, kaputtes JSON, fehlender Key → gnädig
 
     result["latest"] = latest
