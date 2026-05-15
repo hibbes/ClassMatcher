@@ -201,15 +201,36 @@ function renderRules() {
   const items = state.mode === "klasse8"
     ? _buildRulesKlasse8()
     : _buildRulesKlasse5();
-  content.innerHTML = "<ul>" + items.map(it =>
-    `<li class="${it.type} rule-locked" tabindex="0">` +
-    `<span class="rule-lock" title="Diese Regel ist fest verankert">🔒</span>` +
-    `<div class="rule-body"><b>${it.title}</b>` +
-    `<span class="rule-detail">${it.detail}</span></div></li>`
-  ).join("") + "</ul>";
+  content.innerHTML = "<ul>" + items.map(it => {
+    if (it.toggle) {
+      const on = !!state.params[it.toggle];
+      const icon = on ? "✅" : "⭕";
+      const title = on ? "Aktiv (klicken um zu deaktivieren)" : "Aus (klicken um zu aktivieren)";
+      return `<li class="${it.type} rule-toggle ${on ? "rule-on" : "rule-off"}" data-toggle="${it.toggle}" tabindex="0">` +
+        `<span class="rule-icon" title="${title}">${icon}</span>` +
+        `<div class="rule-body"><b>${it.title}</b>` +
+        `<span class="rule-detail">${it.detail}</span></div></li>`;
+    }
+    return `<li class="${it.type} rule-locked" tabindex="0">` +
+      `<span class="rule-icon" title="Diese Regel ist fest verankert">🔒</span>` +
+      `<div class="rule-body"><b>${it.title}</b>` +
+      `<span class="rule-detail">${it.detail}</span></div></li>`;
+  }).join("") + "</ul>";
   for (const li of content.querySelectorAll("li.rule-locked")) {
     li.addEventListener("click", _onLockedRuleClick);
   }
+  for (const li of content.querySelectorAll("li.rule-toggle")) {
+    li.addEventListener("click", _onToggleRuleClick);
+  }
+}
+
+function _onToggleRuleClick(e) {
+  const key = e.currentTarget.dataset.toggle;
+  if (!key) return;
+  state.params[key] = !state.params[key];
+  renderRules();
+  // Backend update + re-assign (gleicher Pfad wie Slider-Update)
+  api.setParams(state.params).then(() => doAssign()).catch(() => {});
 }
 
 // Easter-Egg: Klick auf eine verankerte Regel laesst Goldmuenzen
@@ -256,8 +277,9 @@ function _buildRulesKlasse5() {
   const items = [
     { type: "hard", title: "Bili-Klasse (5c)",
       detail: "Bili-Schüler:innen bleiben hier, Normalzug-SuS füllen auf." },
-    { type: "hard", title: "Musikzug auf 2 Klassen (5a + 5b)",
-      detail: "Musikzug-SuS landen nie in der Bili-Klasse, niemals verstreut über mehr als 2 Klassen." },
+    { type: "hard", toggle: "enforceMusikMaxTwo",
+      title: "Musikzug auf 2 Klassen (5a + 5b)",
+      detail: "Wenn aktiv: Musikzug-SuS hart in max 2 Klassen. Wenn aus: dürfen sich auf alle Nicht-Bili-Klassen verteilen." },
     { type: "hard", title: "Französisch-Klasse (5d)",
       detail: "Lateinfrei — Latein-SuS landen nie hier." },
   ];
@@ -268,8 +290,9 @@ function _buildRulesKlasse5() {
       detail: "Diese SuS landen niemals in derselben Klasse." });
   }
   items.push(
-    { type: "soft", title: "Mindestens 1 Wunsch pro SuS",
-      detail: "Falls möglich kriegt jede:r mit Wünschen mindestens einen erfüllt; rote Karten zeigen Ausnahmen." },
+    { type: "soft", toggle: "enforceMinOneWish",
+      title: "Mindestens 1 Wunsch pro SuS",
+      detail: "Wenn aktiv: Algorithmus bevorzugt Verteilungen, in denen jede:r mit Wünschen mind. einen erfüllt bekommt. Wenn aus: maximiert nur die Gesamt-Wünsche-Zahl." },
     { type: "soft", title: `Freundeswünsche · Gewicht ${p.weightFriendWish ?? 0}/10`,
       detail: "Höher = mehr erfüllte Wünsche zulasten anderer Kriterien." },
     { type: "soft", title: `Geschlechterbalance · Gewicht ${p.weightGenderBalance ?? 0}/10`,
@@ -308,8 +331,9 @@ function _buildRulesKlasse8() {
       detail: "Diese SuS landen niemals in derselben Klasse." });
   }
   items.push(
-    { type: "soft", title: "Mindestens 1 Wunsch pro SuS",
-      detail: "Falls möglich kriegt jede:r mit Wünschen mindestens einen erfüllt." },
+    { type: "soft", toggle: "enforceMinOneWish",
+      title: "Mindestens 1 Wunsch pro SuS",
+      detail: "Wenn aktiv: Algorithmus bevorzugt Verteilungen, in denen jede:r mit Wünschen mind. einen erfüllt bekommt. Wenn aus: maximiert nur die Gesamt-Wünsche-Zahl." },
     { type: "soft", title: `Freundeswünsche · Gewicht ${p.weightFriendWish ?? 0}/10`,
       detail: "Höher = mehr erfüllte Wünsche zulasten anderer Kriterien." },
     { type: "soft", title: `Geschlechterbalance · Gewicht ${p.weightGenderBalance ?? 0}/10`,

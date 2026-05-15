@@ -8,7 +8,7 @@ import threading
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.18"
+APP_VERSION = "1.6.19"
 
 app = Flask(__name__, static_folder="static")
 
@@ -52,6 +52,8 @@ _state: dict = {
         "lateinMode":       "strict",    # Modus klasse8: "strict" | "musik_exception"
         "forceNumClasses":      None,    # Modus klasse8: feste Klassenzahl statt Auto
         "forceBiliSingleClass": False,   # Modus klasse8: alle Bili-SuS in genau einer Klasse
+        "enforceMinOneWish":    True,    # Toggle: mind. 1 Wunsch pro SuS bevorzugen
+        "enforceMusikMaxTwo":   True,    # Modus klasse5: Musikzug hart auf max 2 Klassen
     },
 }
 

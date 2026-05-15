@@ -248,26 +248,38 @@ html, body {
   #rules-panel { display: none; }
 }
 
-#rules-content li.rule-locked {
+#rules-content li.rule-locked,
+#rules-content li.rule-toggle {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
 }
-#rules-content li.rule-locked:hover {
+#rules-content li.rule-locked:hover,
+#rules-content li.rule-toggle:hover {
   background: #fffbeb;
   transform: translateX(1px);
 }
-#rules-content li.rule-locked:active { transform: translateX(2px) scale(0.99); }
-#rules-content li.rule-locked .rule-lock {
+#rules-content li.rule-locked:active,
+#rules-content li.rule-toggle:active { transform: translateX(2px) scale(0.99); }
+#rules-content li .rule-icon {
   flex-shrink: 0;
   font-size: 13px;
-  opacity: 0.45;
+  opacity: 0.6;
   margin-top: 1px;
 }
-#rules-content li.rule-locked .rule-body { flex: 1; }
+#rules-content li.rule-locked .rule-icon { opacity: 0.45; }
+#rules-content li.rule-toggle.rule-on .rule-icon { opacity: 0.95; }
+#rules-content li.rule-toggle.rule-off {
+  background: #f8fafc;
+  opacity: 0.65;
+}
+#rules-content li.rule-toggle.rule-off b { text-decoration: line-through; color: #94a3b8; }
+#rules-content li.rule-toggle.rule-off:hover { opacity: 0.85; }
+#rules-content li.rule-toggle.rule-on { border-left-color: #16a34a; }
+#rules-content li .rule-body { flex: 1; }
 
 /* ════════════════════════════ Easter-Egg ════════════════════════════ */
 @keyframes ee-coin-fall {

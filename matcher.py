@@ -358,6 +358,8 @@ def optimize_mixed_assignment(
     bili_class:       str | None = None,  # diese Klasse bekommt nie Musikzug-Schüler
     music_ids:        set | None = None,  # Schüler-IDs des Musikzugs
     w_music_split:    float = 0.0,        # Gewicht: Musikzug gleichmäßig auf 2 Klassen
+    enforce_min_one_wish: bool = True,    # Soft-Penalty fuer SuS ohne erfuellten Wunsch
+    enforce_music_max_two: bool = True,   # Hard-Cap "Musikzug max 2 Klassen"
 ) -> dict:
     """Simulated Annealing für gemischte Klassen.
 
@@ -396,11 +398,16 @@ def optimize_mixed_assignment(
         if latin_free_class and is_latin.get(sid):
             f.add(latin_free_class)
         if sid in music_ids:
-            # Hard: Musikzug ausschliesslich in den 2 gewaehlten Targets
-            # (bili_class ist per Auswahl-Logik nicht in music_targets_set).
-            for c in class_ids:
-                if c not in music_targets_set:
-                    f.add(c)
+            if enforce_music_max_two:
+                # Hard: Musikzug ausschliesslich in den 2 gewaehlten Targets
+                # (bili_class ist per Auswahl-Logik nicht in music_targets_set).
+                for c in class_ids:
+                    if c not in music_targets_set:
+                        f.add(c)
+            elif bili_class:
+                # Cap aus: Musik darf in jede Nicht-Bili-Klasse, Bili-Klasse
+                # bleibt aber tabu (Bili-Identitaet ist nicht abschaltbar).
+                f.add(bili_class)
         _forbidden_cache[sid] = f
         return f
 
@@ -522,7 +529,8 @@ def optimize_mixed_assignment(
             if a and b and sid2cls.get(a) and sid2cls.get(a) == sid2cls.get(b):
                 vio += 1
         sc -= 10_000 * vio
-        sc -= 1_000 * unmet_count    # Jeder mit Wuenschen soll mind. 1 erfuellt haben
+        if enforce_min_one_wish:
+            sc -= 1_000 * unmet_count  # Jeder mit Wuenschen soll mind. 1 erfuellt haben
         if w_gender > 0:
             for cid in class_ids:
                 boys, girls = gender_counts[cid]
@@ -764,6 +772,8 @@ def _calculate_classes_single(
     w_friend      = params.get("weightFriendWish",    5)
     w_gender      = params.get("weightGenderBalance", 3)
     w_music_split = params.get("weightMusicSplit",    50)
+    enforce_min_wish   = bool(params.get("enforceMinOneWish",    True))
+    enforce_music_cap  = bool(params.get("enforceMusikMaxTwo",   True))
     locked        = locked_students or {}
 
     by_profil: dict = defaultdict(list)
@@ -831,6 +841,8 @@ def _calculate_classes_single(
         bili_class=bili_class,
         music_ids=music_ids,
         w_music_split=w_music_split,
+        enforce_min_one_wish=enforce_min_wish,
+        enforce_music_max_two=enforce_music_cap,
     )
 
     return [
@@ -910,6 +922,10 @@ def refine_friends_klasse5(
             for cid in class_ids
         ]
 
+    _enforce_music_cap = bool(params.get("enforceMusikMaxTwo", True))
+    bili_class_id_set = {sid_cid for sid_cid, sids in asgn.items()
+                         if any(student_map.get(sid, {}).get("profil") == BILI_TRACK for sid in sids)}
+
     _forbidden_cache: dict = {}
 
     def forbidden_for(sid: str) -> set:
@@ -920,9 +936,14 @@ def refine_friends_klasse5(
         if latin_free_class and is_latin.get(sid):
             f.add(latin_free_class)
         if sid in music_ids:
-            # Hard: Musikzug ausschliesslich in den 2 aktuellen Music-Targets
-            for c in class_ids:
-                if c not in music_targets_set:
+            if _enforce_music_cap:
+                # Hard: Musikzug ausschliesslich in den aktuellen Music-Targets
+                for c in class_ids:
+                    if c not in music_targets_set:
+                        f.add(c)
+            else:
+                # Cap aus: Bili-Klasse bleibt aber tabu (strukturelle Identitaet)
+                for c in bili_class_id_set:
                     f.add(c)
         _forbidden_cache[sid] = f
         return f
@@ -977,10 +998,13 @@ def refine_friends_klasse5(
             elif old > 0 and new == 0:
                 unmet_count += 1
 
+    _enforce_min_wish = bool(params.get("enforceMinOneWish", True))
+
     def _full_score(fc: int) -> float:
+        unmet_penalty = 1_000 * unmet_count if _enforce_min_wish else 0
         return float(fc
                      - 1_000_000 * _count_violations(sid2cls, dont_be_with)
-                     - 1_000 * unmet_count)
+                     - unmet_penalty)
 
     cur_score  = _full_score(friend_count)
     best_asgn  = {k: list(v) for k, v in asgn.items()}
