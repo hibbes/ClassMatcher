@@ -78,6 +78,14 @@ def _alert(title: str, msg: str):
 
 
 if __name__ == "__main__":
+    # Falls vom Auto-Update ein .exe.old vom Vorlauf-Build noch herumliegt,
+    # gleich beim Start aufräumen (best-effort, schlägt nie fehl).
+    try:
+        import update as _update
+        _update.cleanup_old_exe()
+    except Exception:
+        pass
+
     # Flask-Server im Daemon-Thread starten
     threading.Thread(target=_run_flask, daemon=True).start()
 

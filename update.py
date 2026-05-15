@@ -1,14 +1,19 @@
 """
 ClassMatcher – Auto-Update
 Prüft die Schul-Homepage auf eine neuere Version und lädt sie herunter.
-Reines stdlib, keine zusätzliche Dependency. Jeder Netz-Fehler ist gnädig:
-der Check liefert dann einfach "kein Update", die App läuft normal weiter.
+Auf Windows zusätzlich: tauscht die laufende EXE direkt am Speicherort
+gegen die neue aus (Windows erlaubt Umbenennen der laufenden .exe).
+Reines stdlib, keine zusätzliche Dependency. Jeder Netz- oder IO-Fehler
+ist gnädig: der Check liefert dann einfach "kein Update", die App läuft
+normal weiter.
 
 Das sys.frozen-Gate (kein Updater wenn aus dem Quellcode gestartet) sitzt
 bewusst in der Flask-Route, damit dieses Modul rein + testbar bleibt.
 """
 import json
 import platform
+import shutil
+import sys
 import urllib.request
 from pathlib import Path
 
@@ -93,9 +98,21 @@ def check_for_update(current_version: str, *,
 def download_update(download_url: str, *,
                     _config=_read_local_config,
                     _opener_factory=_opener,
-                    _target_dir=None) -> dict:
-    """Lädt das Binary nach ~/Downloads/. Liefert {ok: True, path} bzw.
-    bei jedem Fehler {ok: False, fallback_url} (→ Browser-Fallback im UI).
+                    _target_dir=None,
+                    _installer=None) -> dict:
+    """Lädt das Binary nach ~/Downloads/ und installiert es auf Windows
+    direkt am laufenden EXE-Pfad (Rename-Tausch). Auf Mac bleibt es bei
+    "Datei liegt in Downloads, User zieht App in /Applications".
+
+    Rückgabe:
+      {ok: True, path: str, installed: bool}
+        - installed=True  → laufende EXE wurde getauscht, neue ist beim
+          nächsten Start aktiv (Windows-Pfad)
+        - installed=False → Datei in Downloads, manueller Schritt
+          erwartet (Mac-Pfad oder Windows ohne sys.frozen oder Rename-
+          Fehler)
+      {ok: False, fallback_url} bei Netz-/IO-Fehler im Download
+
     Die Unterstrich-Parameter sind Test-Nahtstellen."""
     part = None
     try:
@@ -110,12 +127,56 @@ def download_update(download_url: str, *,
             while chunk := resp.read(65536):
                 fh.write(chunk)
         part.replace(final)
-        return {"ok": True, "path": str(final)}
+
+        installer = _installer if _installer is not None else install_windows
+        installed = bool(installer(final))
+        return {"ok": True, "path": str(final), "installed": installed}
     except Exception:
-        # Stale .part-Datei aufräumen, falls die Übertragung mittendrin abbrach
         if part is not None:
             try:
                 part.unlink(missing_ok=True)
             except OSError:
                 pass
         return {"ok": False, "fallback_url": download_url}
+
+
+def install_windows(new_exe_path) -> bool:
+    """Tauscht die laufende EXE am sys.executable-Pfad gegen new_exe_path.
+    Liefert True bei Erfolg, False bei jedem Problem (kein frozen-Bundle,
+    Schreibrechte fehlen, falsche Plattform). Der Aufrufer behandelt
+    False als "manueller Tausch erforderlich" und zeigt entsprechende
+    UI."""
+    if platform.system() != "Windows":
+        return False
+    if not getattr(sys, "frozen", False):
+        return False  # aus Source gestartet, kein Tausch sinnvoll
+    new_path = Path(new_exe_path)
+    if not new_path.is_file() or new_path.suffix.lower() != ".exe":
+        return False
+    try:
+        current = Path(sys.executable).resolve()
+        old = current.with_suffix(".exe.old")
+        # Restliche .old-Reste aus früherem Update aufräumen (best-effort).
+        try:
+            old.unlink(missing_ok=True)
+        except OSError:
+            pass
+        # Windows lässt das Umbenennen der eigenen laufenden EXE zu.
+        current.rename(old)
+        # Neue EXE an exakt den Pfad legen, an dem die alte war.
+        shutil.move(str(new_path), str(current))
+        return True
+    except Exception:
+        return False
+
+
+def cleanup_old_exe() -> None:
+    """Beim App-Start: alte EXE-Reste vom letzten Update löschen. Best-
+    effort, jeder Fehler wird stillschweigend ignoriert."""
+    if platform.system() != "Windows" or not getattr(sys, "frozen", False):
+        return
+    try:
+        old = Path(sys.executable).resolve().with_suffix(".exe.old")
+        old.unlink(missing_ok=True)
+    except Exception:
+        pass

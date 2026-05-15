@@ -1043,8 +1043,13 @@ async function checkForUpdate() {
     }
     actions.innerHTML = "";
     if (res.ok) {
-      textEl.textContent =
-        `✓ Heruntergeladen: ${res.path} — alte App schließen, neue Datei starten.`;
+      if (res.installed) {
+        textEl.textContent =
+          `✓ Update installiert. Beim nächsten App-Start ist v${info.latest} aktiv – einfach diese App schließen und neu öffnen.`;
+      } else {
+        textEl.textContent =
+          `✓ Heruntergeladen: ${res.path} — alte App schließen, neue Datei starten.`;
+      }
     } else {
       textEl.textContent = "Automatischer Download ging nicht (Proxy?). ";
       const link = document.createElement("a");

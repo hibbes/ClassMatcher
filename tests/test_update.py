@@ -152,6 +152,75 @@ def test_download_update_failure_returns_fallback_and_cleans_part():
     assert leftover == [], f"Erwartete sauberes Zielverzeichnis, fand: {leftover}"
 
 
+@case
+def test_download_update_installer_called_with_final_path_and_records_success():
+    """Wenn _installer True liefert, taucht installed=True im Ergebnis auf."""
+    class _FakeOpener:
+        def open(self, url, timeout=None):
+            return io.BytesIO(b"NEW-EXE-BYTES")
+    installed_with: list = []
+    def _fake_installer(p):
+        installed_with.append(p)
+        return True
+    with tempfile.TemporaryDirectory() as td:
+        res = update.download_update(
+            "https://x/file-v2.exe",
+            _config=lambda: {},
+            _opener_factory=lambda cfg: _FakeOpener(),
+            _target_dir=td,
+            _installer=_fake_installer,
+        )
+    assert res["ok"] is True
+    assert res["installed"] is True, f"Erwartete installed=True, sah {res}"
+    assert len(installed_with) == 1, f"Installer-Aufruf-Anzahl falsch: {installed_with}"
+    assert installed_with[0].name == "file-v2.exe"
+
+
+@case
+def test_download_update_installer_failure_keeps_ok_but_installed_false():
+    """Wenn _installer False liefert (kein Windows, kein frozen, ...),
+    bleibt der Download trotzdem als ok stehen — User muss manuell tauschen."""
+    class _FakeOpener:
+        def open(self, url, timeout=None):
+            return io.BytesIO(b"NEW-EXE-BYTES")
+    with tempfile.TemporaryDirectory() as td:
+        res = update.download_update(
+            "https://x/file-v2.exe",
+            _config=lambda: {},
+            _opener_factory=lambda cfg: _FakeOpener(),
+            _target_dir=td,
+            _installer=lambda p: False,
+        )
+    assert res["ok"] is True
+    assert res["installed"] is False
+
+
+@case
+def test_install_windows_skips_when_not_windows_or_not_frozen():
+    """install_windows ist ein no-op (False) auf Linux/Mac und im Source-
+    Mode (kein sys.frozen). Test laeuft auf Linux ohne PyInstaller-Bundle,
+    deckt beide Bedingungen ab."""
+    import platform, sys as _sys
+    # Auf der Test-Umgebung ist sys.frozen unset und platform.system != Windows.
+    assert update.install_windows("anything") is False
+    # Auch mit einem existierenden Pfad: weiter False, weil Plattform/Bundle
+    # nicht stimmt.
+    with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as tf:
+        tf.write(b"\x4d\x5a")  # MZ header
+        tmp_exe = tf.name
+    try:
+        assert update.install_windows(tmp_exe) is False
+    finally:
+        Path(tmp_exe).unlink(missing_ok=True)
+
+
+@case
+def test_cleanup_old_exe_is_noop_outside_windows():
+    """cleanup_old_exe darf auf Linux/Mac nichts loeschen und nie werfen."""
+    # Wir koennen nicht direkt etwas testen, ausser dass kein Exception fliegt.
+    update.cleanup_old_exe()  # darf einfach durchlaufen
+
+
 def main() -> int:
     failed = 0
     for fn in CASES:
