@@ -6,7 +6,7 @@ import os
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.4"
+APP_VERSION = "1.6.5"
 
 app = Flask(__name__, static_folder="static")
 
@@ -85,22 +85,32 @@ def _apply_class_names(classes: list) -> None:
 
 
 def _klasse5_role_names(classes: list) -> dict:
-    """Default-Namen anhand der Klassen-Rollen ableiten (Modus 5)."""
+    """Default-Namen anhand der Klassen-Rollen ableiten (Modus 5).
+
+    cls["students"] kann entweder Liste von SuS-IDs (Strings, frisch aus
+    dem Matcher) oder Liste von SuS-Dicts (rekonstruierter Stand aus
+    /api/load-state) sein — beides behandeln.
+    """
     student_map = {s["id"]: s for s in _state["students"]}
+
+    def _profil_of(s) -> str:
+        if isinstance(s, dict):
+            return s.get("profil") or ""
+        return student_map.get(s, {}).get("profil") or ""
+
+    def _fs2_of(s) -> str:
+        if isinstance(s, dict):
+            return s.get("fremdsprache2") or ""
+        return student_map.get(s, {}).get("fremdsprache2") or ""
+
     music_per_cls: dict = {}
     has_bili: dict = {}
     has_latin: dict = {}
     for cls in classes:
         sids = cls.get("students", [])
-        music_per_cls[cls["id"]] = sum(
-            1 for sid in sids if student_map.get(sid, {}).get("profil") == "5x"
-        )
-        has_bili[cls["id"]] = any(
-            student_map.get(sid, {}).get("profil") == "5y" for sid in sids
-        )
-        has_latin[cls["id"]] = any(
-            student_map.get(sid, {}).get("fremdsprache2") == "L" for sid in sids
-        )
+        music_per_cls[cls["id"]] = sum(1 for s in sids if _profil_of(s) == "5x")
+        has_bili[cls["id"]]      = any(_profil_of(s) == "5y" for s in sids)
+        has_latin[cls["id"]]     = any(_fs2_of(s) == "L"   for s in sids)
 
     bili_id = next((cid for cid, b in has_bili.items() if b), None)
     music_ids = sorted(
