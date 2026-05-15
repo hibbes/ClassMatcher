@@ -212,19 +212,21 @@ function renderRules() {
   }
 }
 
-// Easter-Egg: Klick auf eine verankerte Regel laesst einmal pro
-// Versions-Bump Goldmuenzen regnen + Jani-Toast oben. Nach einem
-// Auto-Update ist das Easter-Egg wieder freigeschaltet.
-const EE_STORAGE_KEY = "classmatcher_easteregg_seen_in_version";
+// Easter-Egg: Klick auf eine verankerte Regel laesst Goldmuenzen
+// regnen + Schatzkisten-Toast oben. Der Name im Toast haengt am
+// Modus: Christina in Modus 5, Jani in Modus 8. Pro Name einmal am
+// Tag — kommt am naechsten Kalendertag automatisch wieder.
+const EE_STORAGE_KEY = "classmatcher_easteregg_lastseen";
 function _onLockedRuleClick() {
-  const v = state.appVersion;
-  if (!v) return;
-  let seenIn = null;
-  try { seenIn = localStorage.getItem(EE_STORAGE_KEY); } catch { /* private mode */ }
-  if (seenIn === v) return;
-  try { localStorage.setItem(EE_STORAGE_KEY, v); } catch { /* private mode */ }
+  const name = state.mode === "klasse8" ? "Jani" : "Christina";
+  const today = new Date().toISOString().slice(0, 10);  // YYYY-MM-DD lokal genug
+  const key = `${EE_STORAGE_KEY}_${name.toLowerCase()}`;
+  let lastSeen = null;
+  try { lastSeen = localStorage.getItem(key); } catch { /* private mode */ }
+  if (lastSeen === today) return;
+  try { localStorage.setItem(key, today); } catch { /* private mode */ }
   _spawnGoldenCoins(12);
-  _showJaniToast();
+  _showSchatzkisteToast(name);
 }
 
 function _spawnGoldenCoins(n) {
@@ -241,10 +243,10 @@ function _spawnGoldenCoins(n) {
   }
 }
 
-function _showJaniToast() {
+function _showSchatzkisteToast(name) {
   const toast = document.createElement("div");
   toast.className = "ee-toast";
-  toast.innerHTML = "🏆 Jani hat eine Schatzkiste gefunden!";
+  toast.innerHTML = `🏆 ${name} hat eine Schatzkiste gefunden!`;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2600);
 }

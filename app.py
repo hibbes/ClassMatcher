@@ -8,7 +8,7 @@ import threading
 import traceback
 from flask import Flask, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.17"
+APP_VERSION = "1.6.18"
 
 app = Flask(__name__, static_folder="static")
 
