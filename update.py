@@ -17,7 +17,11 @@ import sys
 import urllib.request
 from pathlib import Path
 
-MANIFEST_URL = "https://schiller-offenburg.de/classmatcher/version.json"
+# Wichtig: `www.`-Subdomain verwenden, sonst macht Mittwald 301 von
+# https://schiller-offenburg.de/... auf http://www.schiller-offenburg.de/...
+# (HTTPS->HTTP-Downgrade), den Python's urllib unter PyInstaller-Bundle
+# nicht zulaesst. Mit `www.` 200 OK direkt ohne Redirect.
+MANIFEST_URL = "https://www.schiller-offenburg.de/classmatcher/version.json"
 _CONFIG_PATH = Path.home() / ".classmatcher.cfg"
 _TIMEOUT = 4            # Sekunden – Manifest-Check
 _DOWNLOAD_TIMEOUT = 60  # Sekunden Socket-Idle-Timeout beim Binary-Download

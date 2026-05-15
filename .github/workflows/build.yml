@@ -157,11 +157,15 @@ jobs:
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          # `www.`-Subdomain ist Pflicht: Mittwald macht sonst 301-Downgrade
+          # von HTTPS apex auf HTTP www, was Python's urllib im
+          # PyInstaller-Bundle nicht folgt -> Auto-Update findet "kein
+          # Update". Browser-Pfade tolerieren den Redirect.
           cat > version.json <<EOF
           {
             "version": "${VERSION}",
-            "win_url": "https://schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.exe",
-            "mac_url": "https://schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.dmg",
+            "win_url": "https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.exe",
+            "mac_url": "https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.dmg",
             "notes": ""
           }
           EOF
