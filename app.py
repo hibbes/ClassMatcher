@@ -24,6 +24,17 @@ def _no_cache(response):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"]        = "no-cache"
         response.headers["Expires"]       = "0"
+    # Content-Security-Policy: nur eigene Ressourcen. script-src 'self' (ohne
+    # 'unsafe-inline') blockt injizierte Inline-Skripte -> zweite Verteidigungs-
+    # linie gegen XSS aus Roster-/Wunsch-Freitext (zusaetzlich zum HTML-Escaping).
+    # style-src erlaubt 'unsafe-inline', weil das Frontend ein paar harmlose
+    # inline style=-Attribute nutzt; Style-Injection ist niedrigrisiko und durch
+    # das escapeHtml ohnehin abgedeckt.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self'; "
+        "object-src 'none'; base-uri 'self'"
+    )
     return response
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -228,12 +239,35 @@ def check_update():
 
 @app.route("/api/download-update", methods=["POST"])
 def download_update_route():
-    """Lädt das neue Binary nach ~/Downloads/ (Fallback: Browser-Link)."""
+    """Lädt das neue Binary nach ~/Downloads/ (Fallback: Browser-Link).
+
+    Die Download-URL wird NICHT aus dem Request-Body uebernommen, sondern
+    serverseitig aus dem validierten Manifest abgeleitet (Schutz gegen
+    untergeschobene URLs). Der ganze Download/Swap-Flow laeuft nur im
+    frozen Build (PyInstaller-EXE); aus dem Quellcode wird abgelehnt."""
+    import sys
     import update
-    url = (request.json or {}).get("download_url")
-    if not url:
-        return jsonify({"ok": False, "error": "download_url fehlt"}), 400
-    return jsonify(update.download_update(url))
+
+    if not getattr(sys, "frozen", False):
+        return jsonify({
+            "ok": False,
+            "error": "Update nur in der installierten App möglich, "
+                     "nicht im Quellcode-Modus.",
+        }), 400
+
+    info = update.check_for_update(APP_VERSION)
+    if not info.get("update_available") or not info.get("download_url"):
+        return jsonify({"ok": False, "error": "Kein gültiges Update verfügbar."}), 400
+
+    url = info["download_url"]
+    if not update.url_is_allowed(url):
+        return jsonify({
+            "ok": False,
+            "error": "Update-URL nicht erlaubt (nur HTTPS auf die "
+                     "Schul-Homepage).",
+        }), 400
+
+    return jsonify(update.download_update(url, expected_sha256=info.get("sha256")))
 
 
 @app.route("/<path:filename>")
@@ -512,7 +546,21 @@ def assign():
 
         _state["last_assignment"] = {"classes": response_classes, "stats": stats}
 
-        return jsonify({"classes": response_classes, "stats": stats})
+        # Vollstaendigkeits-Check: Summe der Klassengroessen muss der Anzahl
+        # geladener SuS entsprechen. Bei Abweichung (z.B. lautloser Drop im
+        # Optimierer) eine klare Warnung mitschicken, statt still SuS zu
+        # verlieren – kein Crash, nur Hinweis im JSON.
+        payload = {"classes": response_classes, "stats": stats}
+        assigned_total = sum(len(c["students"]) for c in response_classes)
+        expected_total = len(_state["students"])
+        if assigned_total != expected_total:
+            payload["warning"] = (
+                f"Unvollständige Zuweisung: {assigned_total} von {expected_total} "
+                f"Schüler:innen verteilt ({expected_total - assigned_total} fehlen). "
+                "Bitte prüfen."
+            )
+
+        return jsonify(payload)
 
     except Exception as e:
         traceback.print_exc()

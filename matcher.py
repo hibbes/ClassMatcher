@@ -432,6 +432,7 @@ def optimize_mixed_assignment(
     def _place(students, allowed):
         if not students or not allowed:
             return
+        priority = {c: i for i, c in enumerate(allowed)}
         cap_order = sorted(allowed, key=lambda c: -rem_cap.get(c, 0))
         idx = 0
         rounds = 0
@@ -444,6 +445,15 @@ def optimize_mixed_assignment(
                     idx += 1
                     placed = True
             if not placed:
+                # Cap aller erlaubten Klassen erschoepft – statt SuS lautlos
+                # zu droppen, ueberlaufen die restlichen in die jeweils kleinste
+                # erlaubte Klasse (analog place() im Klasse-8-Pfad). Ties
+                # deterministisch ueber die allowed-Reihenfolge.
+                while idx < len(students):
+                    cid = min(allowed, key=lambda c: (len(z_asgn[c]), priority[c]))
+                    z_asgn[cid].append(students[idx]["id"])
+                    rem_cap[cid] = rem_cap.get(cid, 0) - 1
+                    idx += 1
                 break
             rounds += 1
             if rounds > len(students) + len(allowed) + 1:

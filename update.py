@@ -10,6 +10,7 @@ normal weiter.
 Das sys.frozen-Gate (kein Updater wenn aus dem Quellcode gestartet) sitzt
 bewusst in der Flask-Route, damit dieses Modul rein + testbar bleibt.
 """
+import hashlib
 import json
 import platform
 import shutil
@@ -17,6 +18,7 @@ import ssl
 import sys
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 # certifi bundlet ein Mozilla-CA-Bundle und ist Pflicht im PyInstaller-Build:
 # der gebuendelte Python hat sonst keine erreichbaren System-CAs (auf Mac/Win
@@ -34,9 +36,35 @@ except Exception:
 # (HTTPS->HTTP-Downgrade), den Python's urllib unter PyInstaller-Bundle
 # nicht zulaesst. Mit `www.` 200 OK direkt ohne Redirect.
 MANIFEST_URL = "https://www.schiller-offenburg.de/classmatcher/version.json"
+# Download-URLs aus dem Manifest duerfen ausschliesslich von hier kommen:
+# HTTPS auf die Schul-Homepage. Das verhindert, dass eine manipulierte
+# Antwort (oder ein vom Client untergeschobener Wert) das Binary von einem
+# fremden Host oder ueber unverschluesseltes HTTP zieht.
+_ALLOWED_SCHEMES = ("https",)
+_ALLOWED_HOSTS = (urlparse(MANIFEST_URL).hostname,)  # ("www.schiller-offenburg.de",)
 _CONFIG_PATH = Path.home() / ".classmatcher.cfg"
 _TIMEOUT = 4            # Sekunden – Manifest-Check
 _DOWNLOAD_TIMEOUT = 60  # Sekunden Socket-Idle-Timeout beim Binary-Download
+
+
+def url_is_allowed(url) -> bool:
+    """True, wenn url HTTPS ist und auf einen freigegebenen Host zeigt.
+    Verteidigt gegen HTTP-Downgrade und Download von fremden Hosts."""
+    try:
+        parsed = urlparse(str(url))
+    except (ValueError, AttributeError):
+        return False
+    return (parsed.scheme in _ALLOWED_SCHEMES
+            and parsed.hostname in _ALLOWED_HOSTS)
+
+
+def _log_update(msg: str) -> None:
+    """Best-effort-Diagnose-Log nach /tmp; jeder Fehler wird verschluckt."""
+    try:
+        with open("/tmp/classmatcher-update.log", "a") as fh:
+            fh.write(msg.rstrip("\n") + "\n")
+    except Exception:
+        pass
 
 
 def _read_local_config() -> dict:
@@ -92,12 +120,13 @@ def check_for_update(current_version: str, *,
                      _config=_read_local_config) -> dict:
     """Prüft auf eine neuere Version. Liefert IMMER ein dict, wirft nie.
 
-    Rückgabe: {update_available, current, latest, download_url, notes}.
+    Rückgabe: {update_available, current, latest, download_url, notes, sha256}.
     Bei deaktiviertem Check oder jedem Fehler: update_available=False.
     Die Unterstrich-Parameter sind Test-Nahtstellen.
     """
     result = {"update_available": False, "current": current_version,
-              "latest": None, "download_url": None, "notes": None}
+              "latest": None, "download_url": None, "notes": None,
+              "sha256": None}
 
     cfg = _config()
     if cfg.get("update_check", "").lower() in ("off", "false", "0", "no"):
@@ -127,10 +156,17 @@ def check_for_update(current_version: str, *,
     if cur and new and new > cur:
         result["update_available"] = True
         result["download_url"] = url
+        # Optionaler Integritaets-Hash aus dem Manifest (gegen den die
+        # heruntergeladene Datei vor dem EXE-Tausch geprueft wird).
+        sha = manifest.get("sha256" if platform.system() != "Darwin" else "mac_sha256")
+        if sha is None:
+            sha = manifest.get("sha256")
+        result["sha256"] = str(sha) if sha else None
     return result
 
 
 def download_update(download_url: str, *,
+                    expected_sha256: str | None = None,
                     _config=_read_local_config,
                     _opener_factory=_opener,
                     _target_dir=None,
@@ -139,6 +175,11 @@ def download_update(download_url: str, *,
     direkt am laufenden EXE-Pfad (Rename-Tausch). Auf Mac bleibt es bei
     "Datei liegt in Downloads, User zieht App in /Applications".
 
+    expected_sha256: optionaler Hex-Digest aus dem Manifest. Ist er gesetzt,
+    wird die heruntergeladene Datei vor dem EXE-Tausch dagegen geprueft und
+    der Tausch bei Abweichung abgebrochen. Fehlt er, wird eine deutliche
+    Warnung geloggt (kein stiller Skip).
+
     Rückgabe:
       {ok: True, path: str, installed: bool}
         - installed=True  → laufende EXE wurde getauscht, neue ist beim
@@ -146,21 +187,43 @@ def download_update(download_url: str, *,
         - installed=False → Datei in Downloads, manueller Schritt
           erwartet (Mac-Pfad oder Windows ohne sys.frozen oder Rename-
           Fehler)
-      {ok: False, fallback_url} bei Netz-/IO-Fehler im Download
+      {ok: False, fallback_url} bei Netz-/IO-Fehler im Download oder
+        Hash-Mismatch
 
     Die Unterstrich-Parameter sind Test-Nahtstellen."""
     part = None
     try:
         cfg = _config()
-        filename = download_url.rsplit("/", 1)[-1] or "ClassMatcher-Update"
+        # Dateinamen aus der URL strikt auf den Basename reduzieren –
+        # verhindert Pfad-Traversal (z.B. "../../etc/...") aus einer
+        # manipulierten URL/Manifest-Antwort.
+        raw_name = download_url.rsplit("/", 1)[-1] or "ClassMatcher-Update"
+        filename = Path(raw_name).name or "ClassMatcher-Update"
         target_dir = Path(_target_dir) if _target_dir is not None else Path.home() / "Downloads"
         target_dir.mkdir(parents=True, exist_ok=True)
         final = target_dir / filename
         part = final.parent / (final.name + ".part")
+        hasher = hashlib.sha256()
         with _opener_factory(cfg).open(download_url, timeout=_DOWNLOAD_TIMEOUT) as resp, \
                 open(part, "wb") as fh:
             while chunk := resp.read(65536):
                 fh.write(chunk)
+                hasher.update(chunk)
+
+        # Integritaets-Pruefung VOR dem EXE-Tausch.
+        if expected_sha256:
+            actual = hasher.hexdigest()
+            if actual.lower() != str(expected_sha256).strip().lower():
+                _log_update(
+                    f"[download_update] SHA-256-Mismatch: erwartet "
+                    f"{expected_sha256}, war {actual} – Tausch abgebrochen.")
+                part.unlink(missing_ok=True)
+                return {"ok": False, "fallback_url": download_url,
+                        "error": "Prüfsumme stimmt nicht – Download verworfen."}
+        else:
+            _log_update("[download_update] WARNUNG: kein sha256 im Manifest – "
+                        "Download wird OHNE Integritaetspruefung uebernommen.")
+
         part.replace(final)
 
         installer = _installer if _installer is not None else install_windows

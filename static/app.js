@@ -422,8 +422,8 @@ function renderClassCol(cls) {
     <div class="class-header">
       <div class="class-name-row">
         <span class="class-name"
-              data-class-id="${cls.id}"
-              title="Klicken zum Umbenennen">${cls.name}</span>
+              data-class-id="${escapeAttr(cls.id)}"
+              title="Klicken zum Umbenennen">${escapeHtml(cls.name)}</span>
       </div>
       <div class="class-stats">
         <span class="stat-item">${st.total || 0} Schüler</span>
@@ -434,7 +434,7 @@ function renderClassCol(cls) {
         ${violInfo}
       </div>
     </div>
-    <div class="student-list" data-class-id="${cls.id}"></div>
+    <div class="student-list" data-class-id="${escapeAttr(cls.id)}"></div>
   `;
 
   const list = col.querySelector(".student-list");
@@ -502,7 +502,7 @@ function buildBadgesHtml(student) {
     const profilShort = PROFIL8_SHORT[profil] || profil;
     const profilCls   = PROFIL8_CLASS[profil] || "other";
     const profBadge   = profil
-      ? `<span class="badge badge-${profilCls}" title="${profil}">${profilShort}</span>`
+      ? `<span class="badge badge-${profilCls}" title="${escapeAttr(profil)}">${escapeHtml(profilShort)}</span>`
       : "";
     const biliBadge   = student.bili
       ? `<span class="badge badge-bili" title="Bili-Zug">Bili</span>`
@@ -521,12 +521,12 @@ function buildBadgesHtml(student) {
   const ruLabel   = RU_LABELS[ru] || ru;
   const ruCls     = RU_CLASS[ru]  || "other";
 
-  const trackBadge = `<span class="badge badge-${track}">${trackLabel}</span>`;
+  const trackBadge = `<span class="badge badge-${track}">${escapeHtml(trackLabel)}</span>`;
   const langBadge  = lang
-    ? `<span class="badge badge-${lang}">${langLabel}</span>`
+    ? `<span class="badge badge-${escapeAttr(lang)}">${escapeHtml(langLabel)}</span>`
     : "";
   const ruBadge    = ru
-    ? `<span class="badge badge-ru-${ruCls}" title="Religionsunterricht: ${ru}">${ruLabel}</span>`
+    ? `<span class="badge badge-ru-${ruCls}" title="Religionsunterricht: ${escapeAttr(ru)}">${escapeHtml(ruLabel)}</span>`
     : "";
 
   return `<div class="card-badges">${trackBadge}${langBadge}${ruBadge}</div>`;
@@ -536,12 +536,12 @@ function buildWishHtml(wishInfo) {
   if (!wishInfo || wishInfo.length === 0) return "";
   const parts = wishInfo.map(w => {
     if (w.fulfilled) {
-      return `<span class="wish-tag wish-ok" title="Wunsch erfüllt">✓ ${w.friendName}</span>`;
+      return `<span class="wish-tag wish-ok" title="Wunsch erfüllt">✓ ${escapeHtml(w.friendName)}</span>`;
     } else {
-      const cls = w.friendClass ? ` → ${w.friendClass}` : "";
+      const cls = w.friendClass ? ` → ${escapeHtml(w.friendClass)}` : "";
       const reason = w.reason ? `\n${w.reason}` : "";
       const tip = `Wunsch nicht erfüllt${reason}`;
-      return `<span class="wish-tag wish-miss" title="${escapeAttr(tip)}">✗ ${w.friendName}${cls}</span>`;
+      return `<span class="wish-tag wish-miss" title="${escapeAttr(tip)}">✗ ${escapeHtml(w.friendName)}${cls}</span>`;
     }
   });
   return `<div class="wish-row">${parts.join("")}</div>`;
@@ -549,6 +549,19 @@ function buildWishHtml(wishInfo) {
 
 function escapeAttr(s) {
   return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+// Vollstaendiges HTML-Escaping fuer jeden user-abgeleiteten Wert (Namen,
+// Wuensche, Freitext, gespeicherte Klassennamen), der in innerHTML landet.
+// Verhindert Stored-/DOM-XSS aus CSV-Roster, Wunsch-Freitext oder
+// manipulierten Speicherdateien.
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function buildZeroWishTooltip(wishInfo) {
@@ -587,7 +600,7 @@ function renderStudentCard(student, classId) {
                : student.geschlecht === "w" ? "w" : "x";
 
   const lockBtn = locked
-    ? `<span class="lock-icon" data-student-id="${student.id}" title="Sperre aufheben">🔒</span>`
+    ? `<span class="lock-icon" data-student-id="${escapeAttr(student.id)}" title="Sperre aufheben">🔒</span>`
     : "";
 
   const badgesHtml = buildBadgesHtml(student);
@@ -597,7 +610,7 @@ function renderStudentCard(student, classId) {
     <span class="gender-dot ${gClass}"></span>
     <div class="student-info">
       <div class="student-name-row">
-        <span class="student-name">${student.displayName}</span>
+        <span class="student-name">${escapeHtml(student.displayName)}</span>
         ${badgesHtml}
       </div>
       ${wishHtml}
@@ -791,8 +804,8 @@ async function openFuzzyModal() {
 
       const candidatesHtml = p.candidates.length
         ? p.candidates.map(c => `
-            <div class="fuzzy-candidate" data-sid="${c.id}" data-token="${encodeURIComponent(p.token)}" data-parent-sid="${item.studentId}">
-              ${c.name}
+            <div class="fuzzy-candidate" data-sid="${escapeAttr(c.id)}" data-token="${encodeURIComponent(p.token)}" data-parent-sid="${escapeAttr(item.studentId)}">
+              ${escapeHtml(c.name)}
               <span class="fuzzy-score">${Math.round(c.score * 100)}%</span>
             </div>`).join("")
         : `<p style="font-size:12px;color:#94a3b8">Kein Treffer gefunden</p>`;
@@ -800,16 +813,16 @@ async function openFuzzyModal() {
       div.innerHTML = `
         <div class="fuzzy-item-header">
           <div>
-            <span class="fuzzy-student-name">${item.studentName}</span> wünscht sich:
-            <span class="fuzzy-token">${p.token}</span>
+            <span class="fuzzy-student-name">${escapeHtml(item.studentName)}</span> wünscht sich:
+            <span class="fuzzy-token">${escapeHtml(p.token)}</span>
           </div>
           <div class="fuzzy-original" style="margin-top:2px">
-            Originaltext: „${item.originalText}"
+            Originaltext: „${escapeHtml(item.originalText)}"
           </div>
         </div>
         <div class="fuzzy-candidates">
           ${candidatesHtml}
-          <div class="fuzzy-skip" data-token="${encodeURIComponent(p.token)}" data-parent-sid="${item.studentId}">
+          <div class="fuzzy-skip" data-token="${encodeURIComponent(p.token)}" data-parent-sid="${escapeAttr(item.studentId)}">
             ↷ Ignorieren
           </div>
         </div>
@@ -851,8 +864,8 @@ function renderDontBeWithList() {
     const item = document.createElement("div");
     item.className = "pair-item";
     item.innerHTML = `
-      <span>${pair.label}</span>
-      <button data-a="${pair.a}" data-b="${pair.b}" title="Entfernen">✕</button>
+      <span>${escapeHtml(pair.label)}</span>
+      <button data-a="${escapeAttr(pair.a)}" data-b="${escapeAttr(pair.b)}" title="Entfernen">✕</button>
     `;
     item.querySelector("button").addEventListener("click", async e => {
       const a = e.currentTarget.dataset.a;
@@ -1045,12 +1058,12 @@ function buildPrintView() {
       const wishes = (s.wishInfo || []);
       const wishParts = wishes.map(w => {
         if (w.fulfilled) {
-          return `<span class="pt-wish-yes">✓ ${w.friendName}</span>`;
+          return `<span class="pt-wish-yes">✓ ${escapeHtml(w.friendName)}</span>`;
         }
-        const cls = w.friendClass ? ` (${w.friendClass})` : "";
+        const cls = w.friendClass ? ` (${escapeHtml(w.friendClass)})` : "";
         const showReason = w.reason && w.reason !== w.friendClass;
-        const reason = showReason ? ` <em class="pt-wish-reason">– ${w.reason}</em>` : "";
-        return `<span class="pt-wish-no">✗ ${w.friendName}${cls}${reason}</span>`;
+        const reason = showReason ? ` <em class="pt-wish-reason">– ${escapeHtml(w.reason)}</em>` : "";
+        return `<span class="pt-wish-no">✗ ${escapeHtml(w.friendName)}${cls}${reason}</span>`;
       });
       const wishCell = wishParts.length > 0
         ? `<td class="pt-wish">${wishParts.join(" ")}</td>`
@@ -1062,16 +1075,16 @@ function buildPrintView() {
 
       const ruCell = state.mode === "klasse8"
         ? ""
-        : `<td class="pt-ru">${ruLabel}</td>`;
+        : `<td class="pt-ru">${escapeHtml(ruLabel)}</td>`;
 
       return `
         <tr>
           <td class="pt-num">${i + 1}.</td>
           <td class="pt-name">
-            <span class="print-dot ${gClass}"></span>${nameOut}
+            <span class="print-dot ${gClass}"></span>${escapeHtml(nameOut)}
           </td>
-          <td class="pt-zug">${zugLabel}</td>
-          <td class="pt-lang">${langLabel}</td>
+          <td class="pt-zug">${escapeHtml(zugLabel)}</td>
+          <td class="pt-lang">${escapeHtml(langLabel)}</td>
           ${ruCell}
           ${wishCell}
         </tr>`;
@@ -1092,7 +1105,7 @@ function buildPrintView() {
         <div class="print-header-left">
           <img src="logo.png" alt="Schiller-Gymnasium" class="print-logo" />
           <div>
-            <div class="print-class-name">${cls.name}</div>
+            <div class="print-class-name">${escapeHtml(cls.name)}</div>
             <div class="print-track-line">${trackLabel(track)}</div>
           </div>
         </div>
