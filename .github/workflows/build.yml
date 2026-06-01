@@ -178,11 +178,20 @@ jobs:
           # von HTTPS apex auf HTTP www, was Python's urllib im
           # PyInstaller-Bundle nicht folgt -> Auto-Update findet "kein
           # Update". Browser-Pfade tolerieren den Redirect.
+          # SHA-256 der Binaries ins Manifest schreiben -> der Client
+          # (update.py) verifiziert den Hash vor dem EXE-Tausch.
+          EXE=$(find artifacts -name '*.exe' | head -1)
+          if [ -z "$EXE" ]; then echo "::error::EXE nicht in den Artefakten gefunden"; exit 1; fi
+          WIN_SHA=$(sha256sum "$EXE" | cut -d' ' -f1)
+          DMG=$(find artifacts -name '*.dmg' | head -1)
+          if [ -n "$DMG" ]; then MAC_SHA=$(sha256sum "$DMG" | cut -d' ' -f1); else MAC_SHA=""; fi
           cat > version.json <<EOF
           {
             "version": "${VERSION}",
             "win_url": "https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.exe",
             "mac_url": "https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.dmg",
+            "sha256": "${WIN_SHA}",
+            "mac_sha256": "${MAC_SHA}",
             "notes": ""
           }
           EOF
