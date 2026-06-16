@@ -140,3 +140,42 @@ def test_build_manual_student_unique_ids():
     s2 = matcher.build_manual_student("klasse5", fields, ids); ids.add(s2["id"])
     assert s1["id"] != s2["id"]
     assert s1["id"].startswith("manual-") and s2["id"].startswith("manual-")
+
+
+# ── /api/assign liefert pendingCount (nach Refactor) ──────────────────────
+
+K5_CSV = (
+    "ID;Name;Vorname;Rufname;Geschlecht;Profil1;Klassenpartner;vorhKlasse;"
+    "AbgebendeSchule;Geburtstag;Fremdsprache2;RU;Religion\n"
+    "1;Apfel;Anna;;w;5z;Bernd Birne;;GS Beispiel;01.01.2014;F;rk;rk\n"
+    "2;Birne;Bernd;;m;5z;Anna Apfel;;GS Beispiel;02.02.2014;F;ev;ev\n"
+    "3;Clementine;Carla;;w;5x;;;GS Beispiel;03.03.2014;F;;\n"
+    "4;Dattel;David;;m;5x;;;GS Beispiel;04.04.2014;L;rk;rk\n"
+    "5;Erdbeere;Emma;;w;5y;;;GS Beispiel;05.05.2014;F;;\n"
+    "6;Feige;Felix;;m;5y;;;GS Beispiel;06.06.2014;F;ev;ev\n"
+    "7;Gurke;Greta;;w;5z;;;GS Beispiel;07.07.2014;F;;\n"
+    "8;Holunder;Hans;;m;5z;;;GS Beispiel;08.08.2014;L;rk;rk\n"
+)
+
+
+def _client():
+    app.app.config["TESTING"] = True
+    return app.app.test_client()
+
+
+def _upload_k5(c):
+    return c.post("/api/upload", data={
+        "mode": "klasse5",
+        "file": (io.BytesIO(K5_CSV.encode("utf-8")), "k5.csv"),
+    }, content_type="multipart/form-data")
+
+
+def test_assign_returns_pendingcount():
+    c = _client()
+    assert _upload_k5(c).status_code == 200
+    r = c.post("/api/assign", json={"lockedStudents": {}})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert "classes" in body
+    assert "stats" in body
+    assert "pendingCount" in body

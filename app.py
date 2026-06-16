@@ -491,77 +491,75 @@ def _attach_wish_info(response_classes: list, sm: dict) -> None:
             s["wishInfo"] = wish_info
 
 
-@app.route("/api/assign", methods=["POST"])
-def assign():
+def _assignment_payload(locked: dict) -> dict:
+    """Fuehrt die Klassen-Zuweisung aus und baut die JSON-Antwort.
+
+    Gemeinsamer Kern von /api/assign und /api/add-student. Setzt
+    _state["last_assignment"] und liefert {classes, stats, pendingCount[, warning]}.
+    """
     from matcher import calculate_classes, calculate_classes_klasse8, calculate_stats
 
+    if _state["mode"] == "klasse8":
+        classes = calculate_classes_klasse8(
+            _state["students"], _state["params"], _state["resolved_wishes"],
+            _state["dont_be_with"], locked_students=locked,
+        )
+    else:
+        classes = calculate_classes(
+            _state["students"], _state["params"], _state["resolved_wishes"],
+            _state["dont_be_with"], locked_students=locked,
+        )
+
+    _apply_class_names(classes)
+    sm = _student_map()
+
+    response_classes = [
+        {
+            "id":       cls["id"],
+            "name":     cls.get("name", cls["id"]),
+            "track":    cls["track"],
+            "students": [sm[sid] for sid in cls["students"] if sid in sm],
+        }
+        for cls in classes
+    ]
+    response_classes = _sort_klasse5_classes(response_classes)
+
+    _attach_wish_info(response_classes, sm)
+
+    stats = calculate_stats(
+        [{"id": c["id"], "students": [s["id"] for s in c["students"]]}
+         for c in response_classes],
+        sm,
+        _state["resolved_wishes"],
+        _state["dont_be_with"],
+    )
+
+    _state["last_assignment"] = {"classes": response_classes, "stats": stats}
+
+    payload = {
+        "classes":      response_classes,
+        "stats":        stats,
+        "pendingCount": _pending_count(),
+    }
+    assigned_total = sum(len(c["students"]) for c in response_classes)
+    expected_total = len(_state["students"])
+    if assigned_total != expected_total:
+        payload["warning"] = (
+            f"Unvollständige Zuweisung: {assigned_total} von {expected_total} "
+            f"Schüler:innen verteilt ({expected_total - assigned_total} fehlen). "
+            "Bitte prüfen."
+        )
+    return payload
+
+
+@app.route("/api/assign", methods=["POST"])
+def assign():
     if not _state["students"]:
         return jsonify({"error": "Keine Schüler geladen"}), 400
-
     try:
         data   = request.json or {}
         locked = data.get("lockedStudents", _state["locked_students"])
-
-        if _state["mode"] == "klasse8":
-            classes = calculate_classes_klasse8(
-                _state["students"],
-                _state["params"],
-                _state["resolved_wishes"],
-                _state["dont_be_with"],
-                locked_students=locked,
-            )
-        else:
-            classes = calculate_classes(
-                _state["students"],
-                _state["params"],
-                _state["resolved_wishes"],
-                _state["dont_be_with"],
-                locked_students=locked,
-            )
-
-        _apply_class_names(classes)
-
-        sm = _student_map()
-
-        response_classes = [
-            {
-                "id":       cls["id"],
-                "name":     cls.get("name", cls["id"]),
-                "track":    cls["track"],
-                "students": [sm[sid] for sid in cls["students"] if sid in sm],
-            }
-            for cls in classes
-        ]
-        response_classes = _sort_klasse5_classes(response_classes)
-
-        _attach_wish_info(response_classes, sm)
-
-        stats = calculate_stats(
-            [{"id": c["id"], "students": [s["id"] for s in c["students"]]}
-             for c in response_classes],
-            sm,
-            _state["resolved_wishes"],
-            _state["dont_be_with"],
-        )
-
-        _state["last_assignment"] = {"classes": response_classes, "stats": stats}
-
-        # Vollstaendigkeits-Check: Summe der Klassengroessen muss der Anzahl
-        # geladener SuS entsprechen. Bei Abweichung (z.B. lautloser Drop im
-        # Optimierer) eine klare Warnung mitschicken, statt still SuS zu
-        # verlieren – kein Crash, nur Hinweis im JSON.
-        payload = {"classes": response_classes, "stats": stats}
-        assigned_total = sum(len(c["students"]) for c in response_classes)
-        expected_total = len(_state["students"])
-        if assigned_total != expected_total:
-            payload["warning"] = (
-                f"Unvollständige Zuweisung: {assigned_total} von {expected_total} "
-                f"Schüler:innen verteilt ({expected_total - assigned_total} fehlen). "
-                "Bitte prüfen."
-            )
-
-        return jsonify(payload)
-
+        return jsonify(_assignment_payload(locked))
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
