@@ -218,6 +218,51 @@ def process_wishes(students: list) -> tuple:
     return resolved, pending
 
 
+def add_student_wishes(new_student: dict, existing_students: list,
+                       resolved: dict, pending: dict) -> None:
+    """Inkrementelles, rein additives Wunsch-Update beim Hinzufügen EINES
+    Schülers. Mutiert resolved/pending in-place.
+
+    1) Wünsche des neuen Schülers gegen die bestehenden auflösen.
+    2) Bestehende Schüler nur an ihren NOCH OFFENEN (pending) Tokens gegen
+       den neuen Schüler nachmatchen. Bereits (auch manuell) geklärte Wünsche
+       werden nie angefasst, daher keine Wiederauferstehung.
+    """
+    nid = new_student["id"]
+
+    # 1) Neuer Schüler -> bestehende
+    resolved[nid], pending[nid] = _student_wishes(new_student, existing_students)
+
+    # 2) Bestehende -> nur offene Tokens, nur gegen den Neuen
+    for s in existing_students:
+        sid = s["id"]
+        cur = pending.get(sid)
+        if not cur:
+            continue
+        keep: list = []
+        for slot in cur:
+            m = match_name(slot["token"], [new_student])
+            score = m[0][1] if m else 0.0
+            if score >= AUTO_THRESHOLD:
+                # eindeutig -> auto-auflösen, Token aus pending entfernen
+                resolved.setdefault(sid, [])
+                if nid not in resolved[sid]:
+                    resolved[sid].append(nid)
+                continue  # nicht behalten
+            if score >= SUGGEST_THRESHOLD and not any(
+                c["id"] == nid for c in slot["candidates"]
+            ):
+                slot = {
+                    "token": slot["token"],
+                    "candidates": slot["candidates"] + [
+                        {"id": nid, "name": new_student["displayName"],
+                         "score": score}
+                    ],
+                }
+            keep.append(slot)
+        pending[sid] = keep
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Bewertungsfunktion
 # ──────────────────────────────────────────────────────────────────────────────
