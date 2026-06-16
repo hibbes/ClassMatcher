@@ -263,6 +263,65 @@ def add_student_wishes(new_student: dict, existing_students: list,
         pending[sid] = keep
 
 
+def build_manual_student(mode: str, fields: dict, existing_ids: set) -> dict:
+    """Schüler-Dict aus Formularfeldern bauen, schlüsselgleich zur jeweiligen
+    parse_*-Ausgabe. Vergibt eine kollisionsfreie ID mit Präfix 'manual-'.
+
+    `fields` enthält getrimmte Strings/Booleans aus dem Request.
+    `existing_ids` ist die Menge bereits vergebener IDs.
+    """
+    vorname = fields["vorname"]
+    name    = fields["name"]
+
+    base = f"manual-{normalize(vorname)}-{normalize(name)}".strip("-")
+    sid  = base
+    idx  = 2
+    while sid in existing_ids:
+        sid = f"{base}-{idx}"
+        idx += 1
+
+    fs2 = (fields.get("fremdsprache2") or "F").upper()
+
+    if mode == "klasse8":
+        return {
+            "id":             sid,
+            "name":           name,
+            "vorname":        vorname,
+            "rufname":        "",
+            "displayName":    f"{vorname} {name}".strip(),
+            "geschlecht":     fields.get("geschlecht", ""),
+            "profil":         fields["profil"],
+            "klassenpartner": fields.get("klassenpartner", ""),
+            "vorhKlasse":     "",
+            "abgebendeSchule":"",
+            "geburtsdatum":   "",
+            "fremdsprache2":  fs2,
+            "bili":           bool(fields.get("bili", False)),
+            "latein":         fs2 == "L",
+            "imp_alternativ": bool(fields.get("imp_alternativ", False)),
+        }
+
+    # klasse5
+    rufname       = fields.get("rufname", "")
+    display_first = rufname or vorname
+    return {
+        "id":             sid,
+        "name":           name,
+        "vorname":        vorname,
+        "rufname":        rufname,
+        "displayName":    f"{display_first} {name}".strip(),
+        "geschlecht":     fields.get("geschlecht", ""),
+        "profil":         fields["profil"],
+        "klassenpartner": fields.get("klassenpartner", ""),
+        "vorhKlasse":     "",
+        "abgebendeSchule":"",
+        "geburtsdatum":   "",
+        "fremdsprache2":  fs2,
+        "ru":             fields.get("ru", ""),
+        "religion":       "",
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Bewertungsfunktion
 # ──────────────────────────────────────────────────────────────────────────────

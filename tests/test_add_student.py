@@ -89,3 +89,54 @@ def test_add_student_wishes_suggest_range_adds_candidate_without_mutating():
     assert "y" not in resolved["x"]
     # additiv ohne Mutation der urspruenglichen Kandidatenliste
     assert orig_candidates == []
+
+
+# ── matcher.build_manual_student ──────────────────────────────────────────
+
+def test_build_manual_student_klasse5_keys_and_display():
+    s = matcher.build_manual_student("klasse5", {
+        "vorname": "Mia", "name": "Muster", "rufname": "", "profil": "5z",
+        "geschlecht": "w", "fremdsprache2": "F", "klassenpartner": "", "ru": "rk",
+    }, set())
+    expected = {"id", "name", "vorname", "rufname", "displayName", "geschlecht",
+                "profil", "klassenpartner", "vorhKlasse", "abgebendeSchule",
+                "geburtsdatum", "fremdsprache2", "ru", "religion"}
+    assert set(s.keys()) == expected
+    assert s["displayName"] == "Mia Muster"
+    assert s["id"].startswith("manual-")
+    assert s["religion"] == ""
+    assert s["ru"] == "rk"
+
+
+def test_build_manual_student_klasse5_rufname_wins_in_display():
+    s = matcher.build_manual_student("klasse5", {
+        "vorname": "Maximilian", "name": "Muster", "rufname": "Max",
+        "profil": "5z", "geschlecht": "m", "fremdsprache2": "L",
+        "klassenpartner": "", "ru": "",
+    }, set())
+    assert s["displayName"] == "Max Muster"
+
+
+def test_build_manual_student_klasse8_keys_and_latein():
+    s = matcher.build_manual_student("klasse8", {
+        "vorname": "Ben", "name": "Beispiel", "profil": "NWT",
+        "geschlecht": "m", "fremdsprache2": "L", "klassenpartner": "",
+        "bili": True, "imp_alternativ": False,
+    }, set())
+    expected = {"id", "name", "vorname", "rufname", "displayName", "geschlecht",
+                "profil", "klassenpartner", "vorhKlasse", "abgebendeSchule",
+                "geburtsdatum", "fremdsprache2", "bili", "latein", "imp_alternativ"}
+    assert set(s.keys()) == expected
+    assert s["latein"] is True       # aus fremdsprache2 == "L" abgeleitet
+    assert s["bili"] is True
+    assert s["displayName"] == "Ben Beispiel"
+
+
+def test_build_manual_student_unique_ids():
+    ids = set()
+    fields = {"vorname": "Mia", "name": "Muster", "rufname": "", "profil": "5z",
+              "geschlecht": "w", "fremdsprache2": "F", "klassenpartner": "", "ru": ""}
+    s1 = matcher.build_manual_student("klasse5", fields, ids); ids.add(s1["id"])
+    s2 = matcher.build_manual_student("klasse5", fields, ids); ids.add(s2["id"])
+    assert s1["id"] != s2["id"]
+    assert s1["id"].startswith("manual-") and s2["id"].startswith("manual-")
