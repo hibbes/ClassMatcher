@@ -55,6 +55,14 @@ const api = {
     });
     return r.json();
   },
+  async addStudent(payload) {
+    const r = await fetch("/api/add-student", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload),
+    });
+    return r.json();
+  },
   async setParams(p) {
     await fetch("/api/params", {
       method:  "POST",
@@ -764,6 +772,7 @@ function setupDropZone(listEl) {
 function applyAssignmentResult(result) {
   state.classes = result.classes;
   state.stats   = result.stats;
+  if (result.pendingCount !== undefined) updateFuzzyBadge(result.pendingCount);
   showView("board");
   renderBoard();
 }
@@ -888,6 +897,62 @@ function openPairModal() {
   document.getElementById("pair-a-results").classList.add("hidden");
   document.getElementById("pair-b-results").classList.add("hidden");
   document.getElementById("pair-modal").classList.remove("hidden");
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Schüler:in hinzufügen
+// ──────────────────────────────────────────────────────────────────
+
+function validateAddStudentForm() {
+  const vorname = document.getElementById("as-vorname").value.trim();
+  const name    = document.getElementById("as-name").value.trim();
+  const profil  = document.getElementById("as-profil").value;
+  const gesch    = document.getElementById("as-geschlecht").value;
+  const ok = vorname && name && profil && (gesch === "m" || gesch === "w" || gesch === "d");
+  document.getElementById("add-student-save").disabled = !ok;
+}
+
+function openAddStudentModal() {
+  const modal = document.getElementById("add-student-modal");
+
+  for (const id of ["as-vorname", "as-name", "as-rufname", "as-ru", "as-klassenpartner"]) {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  }
+  document.getElementById("as-geschlecht").value     = "";
+  document.getElementById("as-fremdsprache2").value  = "F";
+  document.getElementById("as-bili").checked         = false;
+  document.getElementById("as-imp").checked          = false;
+
+  // Profil-Dropdown aus den im Datensatz vorhandenen Werten befüllen
+  const profile = [...new Set(state.students.map(s => s.profil).filter(Boolean))].sort();
+  const sel = document.getElementById("as-profil");
+  sel.innerHTML = '<option value="" disabled selected>– bitte wählen –</option>'
+    + profile.map(p => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join("");
+
+  // Modus-spezifische Felder zeigen/verstecken (lokal, ohne Seiteneffekt)
+  modal.querySelectorAll("[data-mode]").forEach(el => {
+    el.classList.toggle("hidden", el.getAttribute("data-mode") !== state.mode);
+  });
+
+  validateAddStudentForm();
+  modal.classList.remove("hidden");
+}
+
+function collectAddStudentForm() {
+  const gesch = document.getElementById("as-geschlecht").value;
+  return {
+    vorname:        document.getElementById("as-vorname").value.trim(),
+    name:           document.getElementById("as-name").value.trim(),
+    rufname:        document.getElementById("as-rufname").value.trim(),
+    geschlecht:     (gesch === "m" || gesch === "w") ? gesch : "",
+    profil:         document.getElementById("as-profil").value,
+    fremdsprache2:  document.getElementById("as-fremdsprache2").value,
+    klassenpartner: document.getElementById("as-klassenpartner").value.trim(),
+    ru:             document.getElementById("as-ru").value.trim(),
+    bili:           document.getElementById("as-bili").checked,
+    imp_alternativ: document.getElementById("as-imp").checked,
+  };
 }
 
 function setupStudentSearch(inputId, hiddenId, resultsId) {
@@ -1458,6 +1523,40 @@ async function init() {
 
     document.getElementById("pair-modal").classList.add("hidden");
     await doAssign();
+  });
+
+  // ── Schüler-hinzufügen-Modal ──────────────────────────────
+  document.getElementById("btn-add-student").addEventListener("click", openAddStudentModal);
+  document.getElementById("add-student-close").addEventListener("click", () =>
+    document.getElementById("add-student-modal").classList.add("hidden")
+  );
+  document.getElementById("add-student-cancel").addEventListener("click", () =>
+    document.getElementById("add-student-modal").classList.add("hidden")
+  );
+  for (const id of ["as-vorname", "as-name"]) {
+    document.getElementById(id).addEventListener("input", validateAddStudentForm);
+  }
+  document.getElementById("as-profil").addEventListener("change", validateAddStudentForm);
+  document.getElementById("as-geschlecht").addEventListener("change", validateAddStudentForm);
+
+  document.getElementById("add-student-save").addEventListener("click", async () => {
+    const saveBtn = document.getElementById("add-student-save");
+    const payload = collectAddStudentForm();
+    if (!payload.vorname || !payload.name || !payload.profil) return;
+    saveBtn.disabled = true;
+    try {
+      const result = await api.addStudent(payload);
+      if (result.error) { alert("Fehler: " + result.error); return; }
+      // Schülerliste auffrischen (für Suche/Render), Muster wie nach Upload
+      state.students = await (await fetch("/api/students")).json();
+      applyAssignmentResult(result);   // setzt auch den Fuzzy-Badge via pendingCount
+      if (result.warning) alert(result.warning);
+      document.getElementById("add-student-modal").classList.add("hidden");
+    } catch (err) {
+      alert("Verbindungsfehler: " + err.message);
+    } finally {
+      saveBtn.disabled = false;
+    }
   });
 
   // ── Hilfe-Modal ───────────────────────────────────────────
