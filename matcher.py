@@ -167,46 +167,53 @@ AUTO_THRESHOLD    = 0.75   # automatisch zuordnen
 SUGGEST_THRESHOLD = 0.45   # als Kandidat vorschlagen
 
 
+def _student_wishes(student: dict, others: list) -> tuple:
+    """Freundeswünsche EINES Schülers gegen `others` auflösen.
+
+    Rückgabe: (resolved_ids: list, pending_items: list)
+    Identische Schwellen/Logik wie process_wishes, nur für einen Schüler.
+    """
+    res: list = []
+    pend: list = []
+
+    for token in tokenize_wishes(student["klassenpartner"]):
+        matches = match_name(token, others)
+
+        if not matches:
+            pend.append({"token": token, "candidates": []})
+
+        elif matches[0][1] >= AUTO_THRESHOLD:
+            mid = matches[0][0]["id"]
+            if mid not in res:
+                res.append(mid)
+
+        else:
+            good = [(s, sc) for s, sc in matches if sc >= SUGGEST_THRESHOLD]
+            pend.append({
+                "token": token,
+                "candidates": [
+                    {"id": s["id"], "name": s["displayName"], "score": sc}
+                    for s, sc in good[:3]
+                ],
+            })
+
+    return res, pend
+
+
 def process_wishes(students: list) -> tuple:
     """Alle Freundeswünsche verarbeiten.
 
     Rückgabe:
         resolved: {student_id: [matched_student_ids]}   – automatisch erkannt
-        pending:  {student_id: [{token, candidates}]}   – manuell klären
+        pending:  {student_id: [{token, candidates}]}    – manuell klären
     """
     resolved: dict = {}
     pending:  dict = {}
 
     for student in students:
-        sid   = student["id"]
-        tokens = tokenize_wishes(student["klassenpartner"])
+        sid    = student["id"]
         others = [s for s in students if s["id"] != sid]
-
-        resolved[sid] = []
-        pending[sid]  = []
-
-        for token in tokens:
-            matches = match_name(token, others)
-
-            if not matches:
-                pending[sid].append({"token": token, "candidates": []})
-
-            elif matches[0][1] >= AUTO_THRESHOLD:
-                # Eindeutig – direkt übernehmen
-                mid = matches[0][0]["id"]
-                if mid not in resolved[sid]:
-                    resolved[sid].append(mid)
-
-            else:
-                # Ambig – zur manuellen Klärung
-                good = [(s, sc) for s, sc in matches if sc >= SUGGEST_THRESHOLD]
-                pending[sid].append({
-                    "token": token,
-                    "candidates": [
-                        {"id": s["id"], "name": s["displayName"], "score": sc}
-                        for s, sc in good[:3]
-                    ],
-                })
+        resolved[sid], pending[sid] = _student_wishes(student, others)
 
     return resolved, pending
 
