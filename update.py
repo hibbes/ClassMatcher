@@ -16,6 +16,7 @@ import platform
 import shutil
 import ssl
 import sys
+import tempfile
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
@@ -43,7 +44,12 @@ MANIFEST_URL = "https://www.schiller-offenburg.de/classmatcher/version.json"
 _ALLOWED_SCHEMES = ("https",)
 _ALLOWED_HOSTS = (urlparse(MANIFEST_URL).hostname,)  # ("www.schiller-offenburg.de",)
 _CONFIG_PATH = Path.home() / ".classmatcher.cfg"
-_TIMEOUT = 4            # Sekunden – Manifest-Check
+# Diagnose-Log plattformuebergreifend: tempfile.gettempdir() liefert /tmp auf
+# Unix und %TEMP% (existierend + schreibbar) auf Windows. Frueher war /tmp
+# hartkodiert, das es auf Windows (der Zielplattform fuer Auto-Update) nicht
+# gibt, weshalb dort nie ein Log entstand und die Schul-PC-Fehler blind blieben.
+_LOG_PATH = Path(tempfile.gettempdir()) / "classmatcher-update.log"
+_TIMEOUT = 4            # Sekunden, Manifest-Check
 _DOWNLOAD_TIMEOUT = 60  # Sekunden Socket-Idle-Timeout beim Binary-Download
 
 
@@ -59,9 +65,10 @@ def url_is_allowed(url) -> bool:
 
 
 def _log_update(msg: str) -> None:
-    """Best-effort-Diagnose-Log nach /tmp; jeder Fehler wird verschluckt."""
+    """Best-effort-Diagnose-Log nach _LOG_PATH (System-Temp, plattformueberg.);
+    jeder Fehler wird verschluckt."""
     try:
-        with open("/tmp/classmatcher-update.log", "a") as fh:
+        with open(_LOG_PATH, "a", encoding="utf-8") as fh:
             fh.write(msg.rstrip("\n") + "\n")
     except Exception:
         pass
@@ -137,17 +144,13 @@ def check_for_update(current_version: str, *,
         latest = str(manifest["version"])
         url = manifest["mac_url" if platform.system() == "Darwin" else "win_url"]
     except Exception as _e:
-        # Diagnose-Log (best-effort): nach /tmp/classmatcher-update.log; wird
-        # gebraucht solange Auto-Update auf manchen Schul-PCs noch nicht klappt.
-        try:
-            import traceback as _tb
-            with open("/tmp/classmatcher-update.log", "a") as _f:
-                _f.write(f"[check_for_update] {type(_e).__name__}: {_e}\n")
-                _f.write(_tb.format_exc())
-                _f.write("---\n")
-        except Exception:
-            pass
-        return result  # offline, Proxy, 404, kaputtes JSON, fehlender Key → gnädig
+        # Diagnose-Log (best-effort): wird gebraucht, solange Auto-Update auf
+        # manchen Schul-PCs noch nicht klappt. Schreibt nach _LOG_PATH (System-
+        # Temp, damit es auch auf Windows entsteht).
+        import traceback as _tb
+        _log_update(f"[check_for_update] FEHLER {type(_e).__name__}: {_e}\n"
+                    f"{_tb.format_exc()}---")
+        return result  # offline, Proxy, 404, kaputtes JSON, fehlender Key -> gnaedig
 
     result["latest"] = latest
     result["notes"] = manifest.get("notes")
@@ -162,6 +165,10 @@ def check_for_update(current_version: str, *,
         if sha is None:
             sha = manifest.get("sha256")
         result["sha256"] = str(sha) if sha else None
+    # Erfolgs-Heartbeat: macht auf Schul-PCs sichtbar, dass ueberhaupt geprueft
+    # wurde und welche Versionen verglichen wurden (current vs latest).
+    _log_update(f"[check_for_update] ok: current={current_version} "
+                f"latest={latest} update_available={result['update_available']}")
     return result
 
 

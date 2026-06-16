@@ -221,6 +221,49 @@ def test_cleanup_old_exe_is_noop_outside_windows():
     update.cleanup_old_exe()  # darf einfach durchlaufen
 
 
+@case
+def test_log_path_is_under_system_tempdir():
+    """Diagnose-Log muss plattformuebergreifend schreibbar sein. Frueher war
+    /tmp hartkodiert, das es auf Windows (der Zielplattform) nicht gibt -> Log
+    entstand dort nie. tempfile.gettempdir() liefert ueberall ein schreibbares
+    Verzeichnis."""
+    assert update._LOG_PATH == Path(tempfile.gettempdir()) / "classmatcher-update.log"
+
+
+@case
+def test_log_update_writes_to_log_path():
+    """_log_update schreibt nach _LOG_PATH (hier auf eine Temp-Datei umgebogen)."""
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "u.log"
+        orig = update._LOG_PATH
+        update._LOG_PATH = p
+        try:
+            update._log_update("hallo-welt")
+        finally:
+            update._LOG_PATH = orig
+        assert p.exists()
+        assert "hallo-welt" in p.read_text(encoding="utf-8")
+
+
+@case
+def test_check_for_update_logs_success_heartbeat():
+    """Auch der Erfolgsfall hinterlaesst eine Log-Zeile (current + latest), damit
+    auf Schul-PCs sichtbar ist, dass ueberhaupt geprueft wurde."""
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "u.log"
+        orig = update._LOG_PATH
+        update._LOG_PATH = p
+        try:
+            update.check_for_update(
+                "1.5.5",
+                _fetcher=lambda cfg: {"version": "1.6.0", "win_url": "u", "mac_url": "u"},
+                _config=lambda: {})
+        finally:
+            update._LOG_PATH = orig
+        text = p.read_text(encoding="utf-8")
+        assert "1.6.0" in text and "1.5.5" in text
+
+
 def main() -> int:
     failed = 0
     for fn in CASES:
