@@ -218,6 +218,9 @@ def test_add_student_klasse5_validation():
         "vorname": "X", "name": "Y", "profil": "", "geschlecht": "w"}).status_code == 400
     assert c.post("/api/add-student", json={
         "vorname": "X", "name": "Y", "profil": "5z", "geschlecht": "q"}).status_code == 400
+    assert c.post("/api/add-student", json={
+        "vorname": "X", "name": "Y", "profil": "5z", "geschlecht": "w",
+        "fremdsprache2": "X"}).status_code == 400
 
 
 def test_add_student_klasse8_integration():
@@ -252,3 +255,21 @@ def test_add_student_preserves_resolved_wishes():
         "vorname": "Tom", "name": "Test", "profil": "5z", "geschlecht": "m"})
     assert r.status_code == 200
     assert app._state["resolved_wishes"]["1"] == ["2"]
+    tom = [s for s in app._state["students"] if s["id"].startswith("manual-")][0]
+    assert tom["fremdsprache2"] == "F"
+
+
+def test_add_student_rolls_back_on_assignment_failure(monkeypatch):
+    c = _client()
+    _upload_k5(c)
+    before = len(app._state["students"])
+    monkeypatch.setattr(
+        app, "_assignment_payload",
+        lambda locked: (_ for _ in ()).throw(RuntimeError("boom")))
+    r = c.post("/api/add-student", json={
+        "vorname": "Rollback", "name": "Test", "profil": "5z", "geschlecht": "m"})
+    assert r.status_code == 500
+    # Schueler wurde zurueckgerollt, kein halb-integrierter Zustand:
+    assert len(app._state["students"]) == before
+    assert not any(s["id"].startswith("manual-") for s in app._state["students"])
+    assert not any(k.startswith("manual-") for k in app._state["resolved_wishes"])

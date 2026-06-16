@@ -566,7 +566,7 @@ def assign():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Klasse umbenennen
+# Schueler manuell hinzufuegen
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.route("/api/add-student", methods=["POST"])
@@ -610,10 +610,16 @@ def add_student():
         "imp_alternativ": bool(data.get("imp_alternativ", False)),
     }
 
+    import copy
+
     existing_ids      = {s["id"] for s in _state["students"]}
     existing_students = list(_state["students"])
     new_student       = build_manual_student(_state["mode"], fields, existing_ids)
 
+    wishes_backup = (
+        copy.deepcopy(_state["resolved_wishes"]),
+        copy.deepcopy(_state["pending_wishes"]),
+    )
     _state["students"].append(new_student)
     add_student_wishes(
         new_student, existing_students,
@@ -623,9 +629,17 @@ def add_student():
     try:
         return jsonify(_assignment_payload(_state["locked_students"]))
     except Exception as e:
+        # Rollback: angehängten Schüler und Wunsch-Mutationen zuruecknehmen,
+        # damit der 500 keinen halb-integrierten Zustand hinterlaesst.
+        _state["students"].pop()
+        _state["resolved_wishes"], _state["pending_wishes"] = wishes_backup
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Klasse umbenennen
+# ──────────────────────────────────────────────────────────────────────────────
 
 @app.route("/api/refine-friends", methods=["POST"])
 def refine_friends():
