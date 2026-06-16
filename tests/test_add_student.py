@@ -179,3 +179,76 @@ def test_assign_returns_pendingcount():
     assert "classes" in body
     assert "stats" in body
     assert "pendingCount" in body
+
+
+# ── /api/add-student ──────────────────────────────────────────────────────
+
+def test_add_student_requires_loaded_roster():
+    app._state["students"] = []
+    c = _client()
+    r = c.post("/api/add-student", json={
+        "vorname": "X", "name": "Y", "profil": "5z", "geschlecht": "w"})
+    assert r.status_code == 400
+
+
+def test_add_student_klasse5_integration():
+    c = _client()
+    assert _upload_k5(c).status_code == 200
+    before = len(app._state["students"])
+    r = c.post("/api/add-student", json={
+        "vorname": "Nora", "name": "Neuling", "profil": "5z",
+        "geschlecht": "w", "fremdsprache2": "F", "klassenpartner": "Anna Apfel",
+    })
+    assert r.status_code == 200
+    body = r.get_json()
+    assert "classes" in body and "stats" in body and "pendingCount" in body
+    assert len(app._state["students"]) == before + 1
+    all_ids = [s["id"] for cls in body["classes"] for s in cls["students"]]
+    new_ids = [s["id"] for s in app._state["students"]
+               if s["id"].startswith("manual-")]
+    assert new_ids and new_ids[0] in all_ids
+
+
+def test_add_student_klasse5_validation():
+    c = _client()
+    _upload_k5(c)
+    assert c.post("/api/add-student", json={
+        "vorname": "", "name": "Y", "profil": "5z", "geschlecht": "w"}).status_code == 400
+    assert c.post("/api/add-student", json={
+        "vorname": "X", "name": "Y", "profil": "", "geschlecht": "w"}).status_code == 400
+    assert c.post("/api/add-student", json={
+        "vorname": "X", "name": "Y", "profil": "5z", "geschlecht": "q"}).status_code == 400
+
+
+def test_add_student_klasse8_integration():
+    c = _client()
+    csv_bytes = (ROOT / "tests" / "fixtures" / "profilwahl_klasse8.csv").read_bytes()
+    up = c.post("/api/upload", data={
+        "mode": "klasse8",
+        "file": (io.BytesIO(csv_bytes), "k8.csv"),
+    }, content_type="multipart/form-data")
+    assert up.status_code == 200
+    before = len(app._state["students"])
+    valid_profil = app._state["students"][0]["profil"]
+    r = c.post("/api/add-student", json={
+        "vorname": "Ben", "name": "Beispiel", "profil": valid_profil,
+        "geschlecht": "m", "fremdsprache2": "L", "bili": True,
+    })
+    assert r.status_code == 200
+    assert len(app._state["students"]) == before + 1
+    new = [s for s in app._state["students"] if s["id"].startswith("manual-")][0]
+    assert new["latein"] is True
+    assert new["bili"] is True
+    assert "imp_alternativ" in new
+
+
+def test_add_student_preserves_resolved_wishes():
+    c = _client()
+    _upload_k5(c)
+    # Simuliere eine zuvor manuell geklaerte Aufloesung:
+    app._state["resolved_wishes"]["1"] = ["2"]
+    app._state["pending_wishes"]["1"] = []
+    r = c.post("/api/add-student", json={
+        "vorname": "Tom", "name": "Test", "profil": "5z", "geschlecht": "m"})
+    assert r.status_code == 200
+    assert app._state["resolved_wishes"]["1"] == ["2"]

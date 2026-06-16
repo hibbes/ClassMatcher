@@ -569,6 +569,64 @@ def assign():
 # Klasse umbenennen
 # ──────────────────────────────────────────────────────────────────────────────
 
+@app.route("/api/add-student", methods=["POST"])
+def add_student():
+    """Einen einzelnen Schueler manuell anlegen und sofort einsortieren."""
+    from matcher import build_manual_student, add_student_wishes
+
+    if not _state["students"]:
+        return jsonify({"error": "Keine Schüler geladen"}), 400
+
+    data = request.json or {}
+
+    def clean(key, maxlen=200):
+        return str(data.get(key) or "").strip()[:maxlen]
+
+    vorname    = clean("vorname")
+    name       = clean("name")
+    profil     = clean("profil")
+    geschlecht = clean("geschlecht").lower()
+    fs2        = (clean("fremdsprache2").upper() or "F")
+
+    if not vorname or not name:
+        return jsonify({"error": "Vorname und Nachname sind Pflicht"}), 400
+    if not profil:
+        return jsonify({"error": "Profil ist Pflicht"}), 400
+    if geschlecht not in ("m", "w", ""):
+        return jsonify({"error": "Ungültiges Geschlecht"}), 400
+    if fs2 not in ("F", "L"):
+        return jsonify({"error": "Ungültige 2. Fremdsprache"}), 400
+
+    fields = {
+        "vorname":        vorname,
+        "name":           name,
+        "profil":         profil,
+        "geschlecht":     geschlecht,
+        "fremdsprache2":  fs2,
+        "rufname":        clean("rufname"),
+        "klassenpartner": clean("klassenpartner", 1000),
+        "ru":             clean("ru"),
+        "bili":           bool(data.get("bili", False)),
+        "imp_alternativ": bool(data.get("imp_alternativ", False)),
+    }
+
+    existing_ids      = {s["id"] for s in _state["students"]}
+    existing_students = list(_state["students"])
+    new_student       = build_manual_student(_state["mode"], fields, existing_ids)
+
+    _state["students"].append(new_student)
+    add_student_wishes(
+        new_student, existing_students,
+        _state["resolved_wishes"], _state["pending_wishes"],
+    )
+
+    try:
+        return jsonify(_assignment_payload(_state["locked_students"]))
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/refine-friends", methods=["POST"])
 def refine_friends():
     """SA-Refinement vom aktuellen Stand, fokussiert nur auf Freundeswünsche.
