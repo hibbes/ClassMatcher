@@ -51,6 +51,11 @@
   <!-- ── Sidebar ── -->
   <aside id="sidebar" class="hidden">
     <section class="sidebar-section">
+      <h3>Schüler:in</h3>
+      <button id="btn-add-student" class="btn btn-ghost btn-sm">+ Schüler:in hinzufügen</button>
+    </section>
+
+    <section class="sidebar-section">
       <h3>Klassengröße</h3>
       <label data-mode="klasse8">
         Min. Schüler/Klasse
@@ -225,6 +230,64 @@
     <div class="modal-footer">
       <button id="pair-cancel" class="btn btn-ghost">Abbrechen</button>
       <button id="pair-save"   class="btn btn-primary">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SCHÜLER-HINZUFÜGEN MODAL ════════════════════ -->
+<div id="add-student-modal" class="modal-overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Schüler:in hinzufügen</h2>
+      <button class="modal-close" id="add-student-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="as-form">
+        <label class="as-row">Vorname *
+          <input type="text" id="as-vorname" autocomplete="off" />
+        </label>
+        <label class="as-row">Nachname *
+          <input type="text" id="as-name" autocomplete="off" />
+        </label>
+        <label class="as-row" data-mode="klasse5">Rufname
+          <input type="text" id="as-rufname" autocomplete="off" />
+        </label>
+        <label class="as-row">Geschlecht *
+          <select id="as-geschlecht">
+            <option value="" disabled selected>– bitte wählen –</option>
+            <option value="m">Junge</option>
+            <option value="w">Mädchen</option>
+            <option value="d">divers / unbekannt</option>
+          </select>
+        </label>
+        <label class="as-row">Profil *
+          <select id="as-profil">
+            <option value="" disabled selected>– bitte wählen –</option>
+          </select>
+        </label>
+        <label class="as-row">2. Fremdsprache
+          <select id="as-fremdsprache2">
+            <option value="F" selected>Französisch</option>
+            <option value="L">Latein</option>
+          </select>
+        </label>
+        <label class="as-row" data-mode="klasse5">Religionsunterricht
+          <input type="text" id="as-ru" autocomplete="off" placeholder="z.B. rk, ev, eth" />
+        </label>
+        <label class="as-check" data-mode="klasse8">
+          <input type="checkbox" id="as-bili" /> <span>Bili-Zug</span>
+        </label>
+        <label class="as-check" data-mode="klasse8">
+          <input type="checkbox" id="as-imp" /> <span>hätte IMP gewählt</span>
+        </label>
+        <label class="as-row">Freundeswünsche
+          <textarea id="as-klassenpartner" rows="2" placeholder="Namen, durch Komma getrennt"></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="add-student-cancel" class="btn btn-ghost">Abbrechen</button>
+      <button id="add-student-save" class="btn btn-primary" disabled>Hinzufügen</button>
     </div>
   </div>
 </div>
