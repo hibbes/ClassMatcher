@@ -70,3 +70,22 @@ def test_add_student_wishes_unrelated_token_preserved():
     matcher.add_student_wishes(new, existing, resolved, pending)
     assert pending["x"] == [{"token": "Zelda Fern", "candidates": []}]
     assert "y" not in resolved.get("x", [])
+
+
+def test_add_student_wishes_suggest_range_adds_candidate_without_mutating():
+    # Token 'Yas' scores 0.571 against Yara Neuling: in [SUGGEST_THRESHOLD=0.45, AUTO_THRESHOLD=0.75)
+    new = {"id": "y", "displayName": "Yara Neuling", "vorname": "Yara",
+           "rufname": "", "name": "Neuling", "klassenpartner": ""}
+    existing = [{"id": "x", "displayName": "Xaver Test", "vorname": "Xaver",
+                 "rufname": "", "name": "Test", "klassenpartner": "Yas"}]
+    orig_candidates = []
+    resolved = {"x": []}
+    pending  = {"x": [{"token": "Yas", "candidates": orig_candidates}]}
+    matcher.add_student_wishes(new, existing, resolved, pending)
+    # Suggest-Treffer: Token bleibt offen, neuer Kandidat ergaenzt, kein Auto-Resolve
+    assert len(pending["x"]) == 1
+    assert pending["x"][0]["token"] == "Yas"
+    assert any(c["id"] == "y" for c in pending["x"][0]["candidates"])
+    assert "y" not in resolved["x"]
+    # additiv ohne Mutation der urspruenglichen Kandidatenliste
+    assert orig_candidates == []

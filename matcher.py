@@ -254,10 +254,10 @@ def add_student_wishes(new_student: dict, existing_students: list,
             ):
                 slot = {
                     "token": slot["token"],
-                    "candidates": slot["candidates"] + [
+                    "candidates": (slot["candidates"] + [
                         {"id": nid, "name": new_student["displayName"],
                          "score": score}
-                    ],
+                    ])[:3],
                 }
             keep.append(slot)
         pending[sid] = keep
