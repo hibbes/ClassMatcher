@@ -1183,3 +1183,19 @@ html, body {
   font-size: 15px;
   line-height: 1;
 }
+
+/* ── Schüler-Hinzufügen-Modal ──────────────────────────────────── */
+.as-form { display: flex; flex-direction: column; gap: 10px; }
+.as-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #334155; font-weight: 500; }
+.as-row input[type="text"],
+.as-row select,
+.as-row textarea {
+  font: inherit; padding: 7px 9px; border: 1px solid #cbd5e1;
+  border-radius: 7px; background: #fff; color: #0f172a;
+}
+.as-row textarea { resize: vertical; }
+.as-row input:focus, .as-row select:focus, .as-row textarea:focus {
+  outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px #6366f133;
+}
+.as-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; }
+#add-student-save[disabled] { opacity: .5; cursor: not-allowed; }
