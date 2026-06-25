@@ -102,7 +102,7 @@ def test_build_manual_student_klasse5_keys_and_display():
                 "profil", "klassenpartner", "vorhKlasse", "abgebendeSchule",
                 "geburtsdatum", "fremdsprache2", "ru", "religion"}
     assert set(s.keys()) == expected
-    assert s["displayName"] == "Mia Muster"
+    assert s["displayName"] == "Muster, Mia"
     assert s["id"].startswith("manual-")
     assert s["religion"] == ""
     assert s["ru"] == "rk"
@@ -114,7 +114,7 @@ def test_build_manual_student_klasse5_rufname_wins_in_display():
         "profil": "5z", "geschlecht": "m", "fremdsprache2": "L",
         "klassenpartner": "", "ru": "",
     }, set())
-    assert s["displayName"] == "Max Muster"
+    assert s["displayName"] == "Muster, Max"
 
 
 def test_build_manual_student_klasse8_keys_and_latein():
@@ -129,7 +129,7 @@ def test_build_manual_student_klasse8_keys_and_latein():
     assert set(s.keys()) == expected
     assert s["latein"] is True       # aus fremdsprache2 == "L" abgeleitet
     assert s["bili"] is True
-    assert s["displayName"] == "Ben Beispiel"
+    assert s["displayName"] == "Beispiel, Ben"
 
 
 def test_build_manual_student_unique_ids():
@@ -273,3 +273,16 @@ def test_add_student_rolls_back_on_assignment_failure(monkeypatch):
     assert len(app._state["students"]) == before
     assert not any(s["id"].startswith("manual-") for s in app._state["students"])
     assert not any(k.startswith("manual-") for k in app._state["resolved_wishes"])
+
+
+# ── matcher._display_name ─────────────────────────────────────────────────
+
+def test_display_name_nachname_zuerst():
+    assert matcher._display_name("Muster", "Mia") == "Muster, Mia"
+
+
+def test_display_name_robust_bei_leeren_teilen():
+    assert matcher._display_name("Muster", "") == "Muster"
+    assert matcher._display_name("", "Mia") == "Mia"
+    assert matcher._display_name("", "") == ""
+    assert matcher._display_name("  Muster  ", "  Mia  ") == "Muster, Mia"

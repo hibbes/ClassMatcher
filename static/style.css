@@ -616,7 +616,7 @@ html, body {
   cursor: grab;
   user-select: none;
   transition: background .15s, border-color .15s, opacity .15s;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .student-card:hover  { background: #eff6ff; border-color: #bfdbfe; }
@@ -644,12 +644,12 @@ html, body {
 
 .student-name-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 5px;
   min-width: 0;
 }
 
-.student-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+.student-name { white-space: normal; overflow-wrap: anywhere; flex-shrink: 1; }
 
 .wish-row {
   display: flex;

@@ -50,9 +50,10 @@ nicht mit `displayName`. Klasseneinteilungen ändern sich nicht.
 
 ### Tests
 
-- `tests/run_golden.py --update`: Golden-Master neu erfassen.
-  **Erwartetes Diff: ausschließlich die `displayName`-Strings** (Reihenfolge gedreht, Komma).
-  Driftet mehr (z.B. Klassenzuordnungen), ist das ein Fehler und wird untersucht, nicht blind erfasst.
+- `tests/run_golden.py` (**ohne** `--update`): muss unverändert grün bleiben. Der Golden-Snapshot
+  erfasst nur Klassen-IDs und Aggregate, **kein `displayName`** (siehe `snapshot()` in `run_golden.py`).
+  Die reine Anzeige-Umstellung darf ihn also gar nicht verändern. Grün = Beweis, dass die Zuweisung
+  unberührt ist. (Ursprünglich war hier `--update` geplant, das ist nicht nötig und wäre irreführend.)
 - `tests/test_add_student.py` nachziehen, falls es `displayName` asserted.
 - Kleiner Unit-Test für `_display_name` inkl. Edge-Cases (leerer Vorname / leerer Nachname).
 
@@ -63,6 +64,6 @@ nicht mit `displayName`. Klasseneinteilungen ändern sich nicht.
 
 ## Verifikation
 
-- Golden-Diff zeigt nur Namens-Strings.
+- Golden-Master bleibt ohne `--update` grün (Zuweisung unberührt).
 - Alle Tests grün (`run_golden.py`, `test_update.py`, `test_add_student.py`).
 - Sichtprüfung im Browser: langer Name bricht um statt „…", Badges bleiben sichtbar.
