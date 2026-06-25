@@ -27,8 +27,15 @@ sys.path.insert(0, BASE_DIR)
 
 def _run_flask():
     import app as flask_app
+    # threaded=True ist Pflicht: der Auto-Update-Download laeuft synchron in
+    # einem Request-Handler und blockiert sonst (Single-Thread-Werkzeug) den
+    # einzigen Worker. Dann werden die 15s-Heartbeats nicht mehr beantwortet und
+    # der 30s-Watchdog killt die App mitten im Download (gerade auf langsamen/
+    # Proxy-Schulnetzen). Mit threaded=True laufen Heartbeat und Download neben-
+    # einander.
     flask_app.app.run(
-        host="127.0.0.1", port=PORT, debug=False, use_reloader=False
+        host="127.0.0.1", port=PORT, debug=False, use_reloader=False,
+        threaded=True,
     )
 
 

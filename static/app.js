@@ -1320,10 +1320,14 @@ async function checkForUpdate() {
     if (res.ok) {
       if (res.installed) {
         textEl.textContent =
-          `✓ Update installiert. Beim nächsten App-Start ist v${info.latest} aktiv – einfach diese App schließen und neu öffnen.`;
+          `✓ Update installiert. Beim nächsten App-Start ist v${info.latest} aktiv. Einfach diese App schließen und neu öffnen.`;
       } else {
-        textEl.textContent =
-          `✓ Heruntergeladen: ${res.path} — alte App schließen, neue Datei starten.`;
+        const isMac = /mac/i.test(
+          (navigator.userAgentData && navigator.userAgentData.platform) ||
+          navigator.platform || navigator.userAgent || "");
+        textEl.textContent = isMac
+          ? `✓ Heruntergeladen: ${res.path}. Jetzt die DMG öffnen und die App nach „Programme" ziehen, dann diese App schließen.`
+          : `✓ Heruntergeladen: ${res.path}. Diese App schließen und die heruntergeladene Datei starten (bzw. die alte ersetzen).`;
       }
     } else {
       textEl.textContent = "Automatischer Download ging nicht (Proxy?). ";
