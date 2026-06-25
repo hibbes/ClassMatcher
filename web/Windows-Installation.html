@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!-- Diese Seite wird vom CI (build.yml, publish-Job) aus dem Repo-Template web/Windows-Installation.html gerendert (Platzhalter __VERSION__/__DATE__) und bei jedem Release auf Mittwald hochgeladen. NICHT die Live-Seite direkt bearbeiten, sondern dieses Template, sonst geht die Aenderung beim naechsten Release verloren. -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Schiller-Klassen-Mixer · Installation auf Windows</title>
+<meta name="description" content="Schiller-Klassen-Mixer für Windows: Schritt-für-Schritt-Installation, keine Admin-Rechte erforderlich. Aktuelle Version __VERSION__." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --petrol: #004058;
+  --petrol-dark: #002c3e;
+  --gold: #ffd566;
+  --gold-soft: rgba(255, 213, 102, 0.18);
+  --bg: #f4f0e8;
+  --bg-grad: #ece6da;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --card: #ffffff;
+  --card-border: rgba(0, 64, 88, 0.12);
+  --code-bg: #f1f5f9;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Plus Jakarta Sans", system-ui, "Segoe UI", -apple-system, sans-serif;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.55;
+}
+.hero {
+  background: var(--petrol);
+  color: white;
+  padding: 4rem 1.5rem 5rem;
+  text-align: center;
+}
+.hero h1 {
+  margin: 0 0 0.6rem;
+  font-size: clamp(2rem, 4.5vw, 3.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.hero .sub {
+  margin: 0 auto;
+  font-size: 1.1rem;
+  opacity: 0.86;
+  max-width: 40rem;
+}
+.hero .version-pill {
+  display: inline-block;
+  margin-top: 1.6rem;
+  padding: 0.45rem 1.1rem;
+  background: var(--gold);
+  color: var(--petrol-dark);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.container {
+  max-width: 760px;
+  margin: -3.5rem auto 0;
+  padding: 0 1.5rem 4rem;
+  width: 100%;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.9rem 2rem;
+  box-shadow: 0 14px 38px rgba(0, 64, 88, 0.09);
+  margin-bottom: 1.4rem;
+}
+.card.primary { border-color: var(--gold); }
+.card .step {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.card h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--petrol);
+  letter-spacing: -0.01em;
+}
+.card p { margin: 0.5rem 0; color: #333; }
+.card ol, .card ul { margin: 0.6rem 0 0.6rem 1.4rem; padding: 0; }
+.card li { margin: 0.45rem 0; }
+.download-wrap { text-align: center; margin: 1rem 0 0.4rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.95rem 1.5rem;
+  background: var(--petrol);
+  color: white;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn:hover { background: var(--petrol-dark); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--gold); color: var(--petrol-dark); }
+.btn-primary:hover { background: var(--gold); filter: brightness(0.95); }
+code {
+  font-family: "Cascadia Code", "Consolas", "Menlo", monospace;
+  background: var(--code-bg);
+  padding: 0.12em 0.5em;
+  border-radius: 4px;
+  font-size: 0.92em;
+}
+.note {
+  background: var(--gold-soft);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+.note strong { color: var(--petrol); }
+.case { margin: 1.6rem 0 1rem; }
+.case h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: var(--petrol);
+  letter-spacing: -0.01em;
+}
+.case h3 .case-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: white;
+  background: var(--petrol);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  vertical-align: 0.1em;
+}
+a.inline-link { color: var(--petrol); }
+footer {
+  margin-top: auto;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(0, 64, 88, 0.08);
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>Schiller-Klassen-Mixer auf Windows installieren</h1>
+  <p class="sub">Eine einzelne EXE-Datei. Keine Installation in <code>C:\Program Files</code> nötig — du legst sie ab, wo's logisch ist, und klickst doppelt.</p>
+  <span class="version-pill">Aktuelle Version __VERSION__</span>
+</section>
+
+<main class="container">
+
+  <article class="card primary">
+    <span class="step">Schritt 1</span>
+    <h2>App herunterladen</h2>
+    <p>Klick auf den Knopf. Edge, Chrome oder Firefox funktionieren alle.</p>
+    <div class="note" style="margin-bottom: 0.4rem;">
+      <strong>Wichtig vorab:</strong> Die App läuft komplett auf deinem PC. Es werden keine Daten ins Internet übertragen. Die einzigen Internet-Zugriffe sind ein gelegentlicher Check auf neuere Versionen und der Download dieser neueren Version, falls du zustimmst.
+    </div>
+    <div class="download-wrap">
+      <a class="btn btn-primary" href="https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v__VERSION__.exe" download>
+        Schiller-Klassen-Mixer für Windows herunterladen (.exe)
+      </a>
+    </div>
+    <div class="note">
+      <strong>Wenn nach dem Klick gar nichts passiert oder eine Warnung kommt:</strong> Manche Browser blockieren den Download stumm, weil die App nicht im Microsoft-Store ist. So kommst du trotzdem an die Datei:
+      <ol>
+        <li><strong>Rechtsklick auf den Knopf</strong> oben.</li>
+        <li>Im Menü <strong>„Link speichern unter …"</strong> oder <strong>„Ziel speichern unter …"</strong> wählen.</li>
+        <li>Es erscheint ggf. ein Warn-Dialog <em>„Diese Datei kann dein Gerät beschädigen"</em>. Klick <strong>„Trotzdem behalten"</strong> (Chrome/Edge) oder <strong>„Beibehalten"</strong> (Firefox).</li>
+        <li>Die Datei landet jetzt im Downloads-Ordner.</li>
+      </ol>
+      Der Browser warnt nur, weil die App keine kostenpflichtige Microsoft-Entwickler-Signatur hat. Sie ist trotzdem sicher, sie kommt direkt vom Schiller-Gymnasium.
+    </div>
+  </article>
+
+  <article class="card">
+    <span class="step">Schritt 2</span>
+    <h2>Die EXE bereitlegen</h2>
+    <ol>
+      <li>Öffne den Datei-Explorer (Symbol mit gelbem Ordner unten in der Taskleiste, oder Windows-Taste + <code>E</code>).</li>
+      <li>Geh links in der Seitenleiste auf <strong>Downloads</strong>. Dort liegt die Datei <code>Schiller-Klassen-Mixer-v__VERSION__.exe</code> (etwa 12 MB). Das ist schon die fertige App, da muss nichts entpackt werden.</li>
+    </ol>
+    <div class="note">
+      <strong>Tipp:</strong> Zieh die EXE per Drag-and-Drop an einen Ort mit Schreibrechten, etwa auf den <strong>Desktop</strong> oder in einen eigenen Ordner. Dann findest du sie leicht wieder und das spätere Auto-Update kann sie dort selbst austauschen. In einen geschützten Ordner wie <code>C:\Program Files</code> gehört sie NICHT, sie braucht keine klassische Installation und ist eine einzige in sich geschlossene Datei.
+    </div>
+  </article>
+
+  <article class="card">
+    <span class="step">Schritt 3</span>
+    <h2>App zum ersten Mal starten</h2>
+    <ol>
+      <li><strong>Doppelklick auf die EXE-Datei.</strong></li>
+    </ol>
+    <p>Wenn alles glatt läuft, öffnet sich nach ein, zwei Sekunden ein Browser-Fenster mit der Adresse <code>http://localhost:5001</code>.</p>
+    <p>Sehr wahrscheinlich kommt aber beim ersten Start eine Sicherheits-Warnung von Windows, weil die App nicht über den Microsoft-Store ausgeliefert wird:</p>
+  </article>
+
+  <article class="card">
+    <h2>Wenn Windows die App blockiert</h2>
+
+    <div class="case">
+      <h3><span class="case-tag">Fall A</span>„Der Computer wurde durch Windows geschützt"</h3>
+      <p>Ein blaues Fenster mit dem Titel <em>„Der Computer wurde durch Windows geschützt"</em> erscheint und nennt SmartScreen als Quelle.</p>
+      <ol>
+        <li>Im Fenster siehst du den Text <em>„Microsoft Defender SmartScreen hat den Start einer unbekannten App verhindert."</em> Darunter ein kleiner Link <strong>„Weitere Informationen"</strong> oder <strong>„Mehr Informationen"</strong>. <strong>Klick darauf.</strong></li>
+        <li>Das Fenster wird länger und zeigt den App-Namen sowie einen neuen Knopf <strong>„Trotzdem ausführen"</strong> unten rechts. <strong>Klick diesen Knopf.</strong></li>
+        <li>Die App startet jetzt. Windows merkt sich diese Entscheidung, ab dem nächsten Mal genügt ein normaler Doppelklick.</li>
+      </ol>
+    </div>
+
+    <div class="case">
+      <h3><span class="case-tag">Fall B</span>Antivirus hat die Datei in Quarantäne verschoben</h3>
+      <p>Bei manchen Antivirus-Programmen (Avast, Kaspersky, Norton …) verschwindet die EXE direkt nach dem Entpacken. In dem Fall hat das Antivirus sie als „verdächtig" markiert und in einen Quarantäne-Bereich verschoben.</p>
+      <ol>
+        <li>Öffne deine Antivirus-Software (Symbol in der Taskleiste unten rechts, eventuell unter dem kleinen Pfeil „verborgene Symbole anzeigen").</li>
+        <li>Such den Bereich <strong>„Quarantäne"</strong> oder <strong>„Verlauf"</strong>.</li>
+        <li>Such den Eintrag <code>Schiller-Klassen-Mixer.exe</code> und klick <strong>„Wiederherstellen"</strong> bzw. <strong>„Vertrauen / Whitelist"</strong>.</li>
+        <li>Zurück in den entpackten Ordner, EXE wieder starten.</li>
+      </ol>
+      <p>Wenn deine Antivirus-Software es zulässt, kannst du die Datei zusätzlich als <strong>Ausnahme</strong> hinzufügen, damit sie bei zukünftigen Updates nicht wieder blockiert wird.</p>
+    </div>
+  </article>
+
+  <article class="card">
+    <h2>Was passiert beim Start?</h2>
+    <p>Sobald die App läuft, öffnet sich automatisch ein Browser-Tab mit <code>http://localhost:5001</code>. Das sieht aus wie eine Website, ist aber keine: der PC spricht hier nur mit sich selbst. Zusätzlich erscheint ein schwarzes Konsolenfenster — das gehört zur App, ignorieren, nicht schließen.</p>
+    <p>Zum Beenden schließt du den Browser-Tab. Die App beendet sich nach etwa 30 Sekunden von selbst — kein Hintergrund-Prozess bleibt liegen.</p>
+  </article>
+
+  <div class="note">
+    <strong>Automatische Updates ab dieser Version:</strong> Beim Start prüft die App selbständig auf neuere Versionen. Falls eine da ist, erscheint oben ein orange-gelbes Banner mit <strong>„Jetzt herunterladen"</strong>. Auf Windows wird die neue EXE im Hintergrund geholt und an genau die Stelle gelegt, an der deine aktuelle EXE liegt. Nächster Start → neue Version aktiv. Du musst also nur diese erste Installation manuell durchziehen.
+  </div>
+
+  <article class="card">
+    <h2>Was tun, wenn nichts klappt?</h2>
+    <p>Schreib <a class="inline-link" href="mailto:m.czernohous@schigy-og.de?subject=Klassen-Mixer%20auf%20Windows%20installieren">Marek</a>, am besten mit:</p>
+    <ul>
+      <li>Einem <strong>Screenshot</strong> der Fehlermeldung. Taste <code>Druck</code> oder <code>PrtScn</code>, dann in eine Mail einfügen.</li>
+      <li>Welche Windows-Version du hast: <em>Start → Einstellungen → System → Info</em>.</li>
+      <li>An welchem Punkt der Anleitung du hängst.</li>
+    </ul>
+    <p>So lässt sich am schnellsten weiterhelfen.</p>
+  </article>
+
+</main>
+
+<footer>
+  Schiller-Gymnasium Offenburg · gepflegt von M. Czernohous · Stand __DATE__
+</footer>
+
+</body>
+</html>

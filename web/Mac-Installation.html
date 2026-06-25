@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!-- Diese Seite wird vom CI (build.yml, publish-Job) aus dem Repo-Template web/Mac-Installation.html gerendert (Platzhalter __VERSION__/__DATE__) und bei jedem Release auf Mittwald hochgeladen. NICHT die Live-Seite direkt bearbeiten, sondern dieses Template, sonst geht die Aenderung beim naechsten Release verloren. -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Schiller-Klassen-Mixer · Installation auf dem Mac</title>
+<meta name="description" content="Schiller-Klassen-Mixer für macOS: Schritt-für-Schritt-Installation für Apple-Silicon-Macs. Aktuelle Version __VERSION__." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --petrol: #004058;
+  --petrol-dark: #002c3e;
+  --gold: #ffd566;
+  --gold-soft: rgba(255, 213, 102, 0.18);
+  --bg: #f4f0e8;
+  --bg-grad: #ece6da;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --card: #ffffff;
+  --card-border: rgba(0, 64, 88, 0.12);
+  --code-bg: #f1f5f9;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.55;
+}
+.hero {
+  background: var(--petrol);
+  color: white;
+  padding: 4rem 1.5rem 5rem;
+  text-align: center;
+}
+.hero h1 {
+  margin: 0 0 0.6rem;
+  font-size: clamp(2rem, 4.5vw, 3.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.hero .sub {
+  margin: 0 auto;
+  font-size: 1.1rem;
+  opacity: 0.86;
+  max-width: 40rem;
+}
+.hero .version-pill {
+  display: inline-block;
+  margin-top: 1.6rem;
+  padding: 0.45rem 1.1rem;
+  background: var(--gold);
+  color: var(--petrol-dark);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.container {
+  max-width: 760px;
+  margin: -3.5rem auto 0;
+  padding: 0 1.5rem 4rem;
+  width: 100%;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.9rem 2rem;
+  box-shadow: 0 14px 38px rgba(0, 64, 88, 0.09);
+  margin-bottom: 1.4rem;
+}
+.card.primary { border-color: var(--gold); }
+.card .step {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.card h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--petrol);
+  letter-spacing: -0.01em;
+}
+.card p { margin: 0.5rem 0; color: #333; }
+.card ol, .card ul { margin: 0.6rem 0 0.6rem 1.4rem; padding: 0; }
+.card li { margin: 0.45rem 0; }
+.download-wrap { text-align: center; margin: 1rem 0 0.4rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.95rem 1.5rem;
+  background: var(--petrol);
+  color: white;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn:hover { background: var(--petrol-dark); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--gold); color: var(--petrol-dark); }
+.btn-primary:hover { background: var(--gold); filter: brightness(0.95); }
+code {
+  font-family: "Menlo", "Consolas", monospace;
+  background: var(--code-bg);
+  padding: 0.12em 0.5em;
+  border-radius: 4px;
+  font-size: 0.92em;
+}
+pre {
+  background: var(--code-bg);
+  border-left: 3px solid var(--petrol);
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 0.86rem;
+  overflow-x: auto;
+  margin: 0.8rem 0;
+}
+.note {
+  background: var(--gold-soft);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+.note strong { color: var(--petrol); }
+.case { margin: 1.6rem 0 1rem; }
+.case h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: var(--petrol);
+  letter-spacing: -0.01em;
+}
+.case h3 .case-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: white;
+  background: var(--petrol);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  vertical-align: 0.1em;
+}
+a.inline-link { color: var(--petrol); }
+footer {
+  margin-top: auto;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(0, 64, 88, 0.08);
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>Schiller-Klassen-Mixer auf dem Mac installieren</h1>
+  <p class="sub">Schritt-für-Schritt für Apple-Silicon-Macs (M1, M2, M3, M4). Auch wenn du noch nie eine App außerhalb des App-Stores installiert hast.</p>
+  <span class="version-pill">Aktuelle Version __VERSION__</span>
+</section>
+
+<main class="container">
+
+  <article class="card primary">
+    <span class="step">Schritt 1</span>
+    <h2>App herunterladen</h2>
+    <p>Klick auf den Knopf. Safari oder Chrome funktionieren beide.</p>
+    <div class="note" style="margin-bottom: 0.4rem;">
+      <strong>Wichtig vorab:</strong> Die App läuft komplett auf deinem Mac. Es werden keine Daten ins Internet übertragen. Die einzigen Internet-Zugriffe sind ein gelegentlicher Check auf neuere Versionen und der Download dieser neueren Version, falls du zustimmst.
+    </div>
+    <div class="download-wrap">
+      <a class="btn btn-primary" href="https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v__VERSION__.dmg" download>
+        Schiller-Klassen-Mixer für Mac herunterladen (.dmg)
+      </a>
+    </div>
+    <div class="note">
+      <strong>Wenn nach dem Klick gar nichts passiert oder eine Warnung kommt:</strong> Manche Browser blockieren den Download stumm, weil die App nicht im App-Store ist. So kommst du trotzdem an die Datei:
+      <ol>
+        <li><strong>Rechtsklick auf den Knopf</strong> oben (bei MacBook ohne externe Maus: <code>Control</code>-Taste halten und einmal mit zwei Fingern aufs Trackpad tippen).</li>
+        <li>Im Menü <strong>„Link speichern unter …"</strong> wählen.</li>
+        <li>Es erscheint ggf. ein Warn-Dialog <em>„Diese Datei kann dein Gerät beschädigen"</em>. Klick <strong>„Trotzdem behalten"</strong> (Chrome/Edge) oder <strong>„Beibehalten"</strong> (Safari).</li>
+        <li>Die Datei landet jetzt im Downloads-Ordner.</li>
+      </ol>
+      Der Browser warnt nur, weil die App keine kostenpflichtige Apple-Entwickler-Signatur hat. Sie ist trotzdem sicher, sie kommt direkt vom Schiller-Gymnasium.
+    </div>
+  </article>
+
+  <article class="card">
+    <span class="step">Schritt 2</span>
+    <h2>DMG öffnen und App ins Programme-Verzeichnis</h2>
+    <ol>
+      <li>Öffne den Downloads-Ordner. Da liegt eine Datei <code>Schiller-Klassen-Mixer-v__VERSION__.dmg</code> (etwa 13 MB).</li>
+      <li><strong>Doppelklick auf die DMG-Datei.</strong> Es öffnet sich ein neues Fenster mit zwei Symbolen: die App <strong>Schiller-Klassen-Mixer</strong> und einen Pfeil auf den Ordner <strong>Programme</strong>.</li>
+      <li><strong>Zieh die App mit der Maus auf den Programme-Ordner.</strong> Halte die linke Maustaste auf dem App-Symbol gedrückt, schieb es auf das Programme-Symbol und lass dann los.</li>
+      <li>Schließ das DMG-Fenster (rotes Knöpfchen oben links). Die DMG-Datei im Downloads-Ordner kannst du später in den Papierkorb ziehen.</li>
+    </ol>
+  </article>
+
+  <article class="card">
+    <span class="step">Schritt 3</span>
+    <h2>App zum ersten Mal starten</h2>
+    <ol>
+      <li>Öffne den Finder (blau-weißes Smiley-Symbol unten in der Dock-Leiste, ganz links).</li>
+      <li>Klick links auf <strong>Programme</strong>. Suche <strong>Schiller-Klassen-Mixer</strong> in der Liste.</li>
+      <li><strong>Doppelklick auf die App.</strong></li>
+    </ol>
+    <p>Wenn alles glatt läuft, öffnet sich nach ein, zwei Sekunden ein Browser-Fenster mit der Adresse <code>http://localhost:5001</code>, und du siehst die Oberfläche des Klassen-Mixers.</p>
+    <p>Sehr wahrscheinlich kommt aber beim ersten Start eine Warnmeldung, weil die App nicht über den App-Store von Apple geprüft wurde. Welche Meldung erscheint, hängt von deiner macOS-Version ab. Such unten den passenden Fall.</p>
+  </article>
+
+  <article class="card">
+    <h2>Wenn macOS die App blockiert</h2>
+
+    <div class="case">
+      <h3><span class="case-tag">Fall A</span>„Die App kann nicht geöffnet werden, weil der Entwickler nicht überprüft werden kann"</h3>
+      <p>Häufigster Fall. So gibst du die App frei:</p>
+      <ol>
+        <li>Klick in der Fehlermeldung auf <strong>Abbrechen</strong>.</li>
+        <li>Geh zurück in den Programme-Ordner.</li>
+        <li><strong>Klick jetzt nicht mit Doppelklick</strong>, sondern mit der <strong>rechten Maustaste</strong> auf das App-Symbol (am MacBook ohne externe Maus: <code>Control</code>-Taste halten und einmal tippen).</li>
+        <li>Im Menü oben <strong>„Öffnen"</strong> wählen.</li>
+        <li>Eine zweite Meldung erscheint, jetzt mit einem zusätzlichen Knopf <strong>„Öffnen"</strong>. Klick diesen Knopf.</li>
+      </ol>
+      <p>Die App startet jetzt. Ab dem nächsten Mal genügt ein normaler Doppelklick.</p>
+    </div>
+
+    <div class="case">
+      <h3><span class="case-tag">Fall B</span>macOS 15 Sequoia: Rechtsklick funktioniert nicht</h3>
+      <p>Falls beim Rechtsklick aus Fall A kein „Öffnen" im Menü erscheint oder die App trotzdem nicht startet, hast du wahrscheinlich macOS 15 Sequoia. Apple geht hier einen strengeren Weg:</p>
+      <ol>
+        <li>Starte die App ganz normal per Doppelklick. Die Fehlermeldung kommt wieder — auf <strong>Fertig</strong> oder <strong>Abbrechen</strong> klicken.</li>
+        <li>Öffne die <strong>Systemeinstellungen</strong> (Apple-Symbol oben links → Systemeinstellungen).</li>
+        <li>Links zu <strong>Datenschutz &amp; Sicherheit</strong> wechseln.</li>
+        <li>Im rechten Bereich nach unten scrollen, dort steht <em>„Schiller-Klassen-Mixer wurde zur Verwendung blockiert …"</em></li>
+        <li>Auf <strong>„Trotzdem öffnen"</strong> klicken, mit Mac-Passwort oder Touch-ID bestätigen.</li>
+        <li>Im Programme-Ordner App erneut per Doppelklick starten, im erscheinenden Dialog auf <strong>„Öffnen"</strong>.</li>
+      </ol>
+    </div>
+
+    <div class="case">
+      <h3><span class="case-tag">Fall C</span>„Schiller-Klassen-Mixer ist beschädigt und kann nicht geöffnet werden"</h3>
+      <p>Die Meldung schaut alarmierend aus, ist es aber nicht. Manche Browser setzen beim Download eine strenge Sicherheitsmarke, die macOS überkritisch nimmt. Wir entfernen sie mit einem Befehl im Terminal.</p>
+      <div class="note">
+        <strong>Was ist das Terminal?</strong> Ein Fenster, in dem du statt mit der Maus per Text mit dem Mac sprichst. Für uns reicht ein einziger Befehl, danach wieder schließen.
+      </div>
+      <p><strong>So öffnest du das Terminal:</strong></p>
+      <ul>
+        <li><strong>Einfachster Weg:</strong> <code>Cmd</code> + <code>Leertaste</code> gleichzeitig drücken, im Spotlight-Feld <strong>Terminal</strong> eintippen, <code>Enter</code>.</li>
+        <li><strong>Alternativ:</strong> Finder → Menü <strong>Gehe zu</strong> → <strong>Dienstprogramme</strong> → <strong>Terminal</strong> doppelklicken.</li>
+      </ul>
+      <p>Markier den folgenden Befehl komplett, kopier ihn mit <code>Cmd</code>+<code>C</code> und füg ihn im Terminal mit <code>Cmd</code>+<code>V</code> ein:</p>
+      <pre>xattr -dr com.apple.quarantine /Applications/Schiller-Klassen-Mixer.app</pre>
+      <p><code>Enter</code> drücken. Es kommt <strong>keine sichtbare Rückmeldung</strong>, das ist normal. Terminal schließen und App ganz normal per Doppelklick starten.</p>
+    </div>
+  </article>
+
+  <article class="card">
+    <h2>Was passiert beim Start?</h2>
+    <p>Sobald die App läuft, öffnet sich automatisch ein Browser-Tab mit <code>http://localhost:5001</code>. Das sieht aus wie eine Website, ist aber keine: der Mac spricht hier nur mit sich selbst. Wenn du den Tab schließt, beendet sich die App nach etwa 30 Sekunden von selbst — kein Hintergrund-Prozess bleibt liegen.</p>
+  </article>
+
+  <div class="note">
+    <strong>Automatische Updates ab dieser Version:</strong> Beim Start prüft die App selbständig auf neuere Versionen. Falls eine da ist, erscheint oben ein orange-gelbes Banner mit <strong>„Jetzt herunterladen"</strong>. Die neue Version landet in deinem Downloads-Ordner; auf macOS musst du die .dmg dann einmal manuell ins Programme-Verzeichnis ziehen wie in Schritt 2. Diese erste Installation läuft also manuell, danach läuft das im Hintergrund.
+  </div>
+
+  <article class="card">
+    <h2>Was tun, wenn nichts klappt?</h2>
+    <p>Schreib <a class="inline-link" href="mailto:m.czernohous@schigy-og.de?subject=Klassen-Mixer%20auf%20Mac%20installieren">Marek</a>, am besten mit:</p>
+    <ul>
+      <li>Einem <strong>Screenshot</strong> der Fehlermeldung. Screenshot machst du mit <code>Cmd</code>+<code>Shift</code>+<code>4</code>, dann den fraglichen Bereich aufziehen. Das Bild landet auf dem Schreibtisch.</li>
+      <li>Welche macOS-Version du hast. Apple-Menü → <em>„Über diesen Mac"</em>.</li>
+      <li>An welchem Punkt der Anleitung du hängst.</li>
+    </ul>
+    <p>So lässt sich am schnellsten weiterhelfen.</p>
+  </article>
+
+</main>
+
+<footer>
+  Schiller-Gymnasium Offenburg · gepflegt von M. Czernohous · Stand __DATE__
+</footer>
+
+</body>
+</html>

@@ -175,6 +175,8 @@ jobs:
     if: always() && needs.build-windows.result == 'success' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Version aus Tag ableiten
         id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
@@ -214,6 +216,20 @@ jobs:
           fi
           cat version.json
 
+      - name: Landing-Pages rendern (Version + Datum)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Die Installations-Anleitungen liegen als Templates in web/ mit
+          # __VERSION__/__DATE__-Platzhaltern. Hier auf die Release-Version
+          # gerendert, damit sie nie wieder gegenueber der App driften (frueher
+          # manuell, deshalb standen sie laenger auf einer alten Version).
+          DATE=$(python3 -c "import datetime; m=['','Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember']; d=datetime.date.today(); print(f'{d.day}. {m[d.month]} {d.year}')")
+          for tpl in Mac-Installation Windows-Installation; do
+            sed -e "s/__VERSION__/${VERSION}/g" -e "s/__DATE__/${DATE}/g" "web/${tpl}.html" > "${tpl}.html"
+            echo "gerendert: ${tpl}.html (v${VERSION}, ${DATE})"
+          done
+
       - name: Upload zur Homepage (Binaries zuerst, version.json zuletzt)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -234,7 +250,9 @@ jobs:
           if [ -n "$DMG" ]; then
             UPLOAD_LIST+=("$DMG")
           fi
-          UPLOAD_LIST+=("version.json")
+          # Anleitungen vor version.json: sie verweisen auf die schon
+          # hochgeladenen Binaries; version.json bleibt das Letzte.
+          UPLOAD_LIST+=("Mac-Installation.html" "Windows-Installation.html" "version.json")
           for f in "${UPLOAD_LIST[@]}"; do
             echo "Lade hoch: $f"
             curl --fail --silent --show-error --ftp-create-dirs \
