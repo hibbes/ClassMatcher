@@ -27,7 +27,7 @@ def normalize(name: str) -> str:
     return s
 
 
-def _display_name(nachname: str, vorname: str) -> str:
+def display_name(nachname: str, vorname: str) -> str:
     """Anzeigename als 'Nachname, Vorname'.
 
     Robust gegen leere Teile: fehlt einer der beiden, wird ohne Komma nur der
@@ -71,7 +71,7 @@ def parse_csv(content: str) -> list:
             "name":           name,
             "vorname":        vorname,
             "rufname":        rufname,
-            "displayName":    _display_name(name, display_first),
+            "displayName":    display_name(name, display_first),
             "geschlecht":     (row.get("Geschlecht") or "").strip().lower(),
             "profil":         profil,
             "klassenpartner": (row.get("Klassenpartner") or "").strip(),
@@ -301,7 +301,7 @@ def build_manual_student(mode: str, fields: dict, existing_ids: set) -> dict:
             "name":           name,
             "vorname":        vorname,
             "rufname":        "",
-            "displayName":    _display_name(name, vorname),
+            "displayName":    display_name(name, vorname),
             "geschlecht":     fields.get("geschlecht", ""),
             "profil":         fields["profil"],
             "klassenpartner": fields.get("klassenpartner", ""),
@@ -322,7 +322,7 @@ def build_manual_student(mode: str, fields: dict, existing_ids: set) -> dict:
         "name":           name,
         "vorname":        vorname,
         "rufname":        rufname,
-        "displayName":    _display_name(name, display_first),
+        "displayName":    display_name(name, display_first),
         "geschlecht":     fields.get("geschlecht", ""),
         "profil":         fields["profil"],
         "klassenpartner": fields.get("klassenpartner", ""),
@@ -1405,7 +1405,7 @@ def parse_csv_klasse8(content: str) -> list:
             "name":           name,
             "vorname":        vorname,
             "rufname":        "",
-            "displayName":    _display_name(name, vorname),
+            "displayName":    display_name(name, vorname),
             "geschlecht":     geschlecht,
             "profil":         profil,
             "klassenpartner": (row.get(friends_col) or "").strip(),

@@ -275,14 +275,33 @@ def test_add_student_rolls_back_on_assignment_failure(monkeypatch):
     assert not any(k.startswith("manual-") for k in app._state["resolved_wishes"])
 
 
-# ── matcher._display_name ─────────────────────────────────────────────────
+# ── matcher.display_name ─────────────────────────────────────────────────
 
 def test_display_name_nachname_zuerst():
-    assert matcher._display_name("Muster", "Mia") == "Muster, Mia"
+    assert matcher.display_name("Muster", "Mia") == "Muster, Mia"
 
 
 def test_display_name_robust_bei_leeren_teilen():
-    assert matcher._display_name("Muster", "") == "Muster"
-    assert matcher._display_name("", "Mia") == "Mia"
-    assert matcher._display_name("", "") == ""
-    assert matcher._display_name("  Muster  ", "  Mia  ") == "Muster, Mia"
+    assert matcher.display_name("Muster", "") == "Muster"
+    assert matcher.display_name("", "Mia") == "Mia"
+    assert matcher.display_name("", "") == ""
+    assert matcher.display_name("  Muster  ", "  Mia  ") == "Muster, Mia"
+
+
+# ── /api/load-state: Anzeigeformat beim Laden neu ableiten ─────────────────
+
+def test_load_state_rebuilds_displayname_to_new_format():
+    """Ein gespeicherter Stand mit altem 'Vorname Nachname' bekommt beim Laden
+    das aktuelle 'Nachname, Vorname' (gilt auch fuer bereits exportierte Dateien)."""
+    c = _client()
+    assert _upload_k5(c).status_code == 200
+    assert c.post("/api/assign", json={"lockedStudents": {}}).status_code == 200
+
+    saved = c.get("/api/save-state").get_json()
+    for s in saved["students"]:                      # altes Format simulieren
+        s["displayName"] = f"{s['vorname']} {s['name']}"
+
+    assert c.post("/api/load-state", json=saved).status_code == 200
+    assert app._state["students"]
+    for s in app._state["students"]:
+        assert s["displayName"] == f"{s['name']}, {s['rufname'] or s['vorname']}"

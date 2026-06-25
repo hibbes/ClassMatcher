@@ -758,7 +758,7 @@ def save_state():
 @app.route("/api/load-state", methods=["POST"])
 def load_state():
     """Gespeicherten Stand wiederherstellen."""
-    from matcher import calculate_stats
+    from matcher import calculate_stats, display_name
 
     data = request.json or {}
 
@@ -767,6 +767,11 @@ def load_state():
         return jsonify({"error": "Ungültige Speicherdatei (unbekannter Modus)"}), 400
     _state["mode"]            = mode
     _state["students"]        = data.get("students", [])
+    # Anzeigenamen aus den Rohfeldern neu ableiten: aeltere Speicherstaende
+    # tragen evtl. ein veraltetes displayName-Format. So bekommt auch ein
+    # geladener Stand sofort das aktuelle "Nachname, Vorname".
+    for _s in _state["students"]:
+        _s["displayName"] = display_name(_s.get("name", ""), _s.get("rufname") or _s.get("vorname", ""))
     _state["resolved_wishes"] = data.get("resolved_wishes", {})
     _state["pending_wishes"]  = data.get("pending_wishes", {})
     _state["dont_be_with"]    = data.get("dont_be_with", [])

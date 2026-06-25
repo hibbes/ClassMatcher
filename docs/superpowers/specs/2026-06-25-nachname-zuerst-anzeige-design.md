@@ -30,15 +30,26 @@ nur abgeschnitten („Müller, Maxim…") sichtbar.
 `displayName` wird zentral genutzt (Karten, Liste offener Wünsche, Such-Dropdown beim
 manuellen Hinzufügen), daher die Umstellung an der Quelle:
 
-- Neue Modul-Helper-Funktion `_display_name(nachname, vorname)`, die `"Nachname, Vorname"`
-  baut und **robust gegen leere Felder** ist (kein hängendes Komma, kein führendes Komma).
-- Eingesetzt an den drei `displayName`-Konstruktionsstellen:
-  - Modus-5-CSV-Parser (~`:61`), `display_first = rufname or vorname`
-  - gemeinsamer Schüler-Builder klasse5 (~`:312`)
-  - Modus-8-Parser (~`:1395`)
+- Neue öffentliche Modul-Helper-Funktion `display_name(nachname, vorname)`, die `"Nachname, Vorname"`
+  baut und **robust gegen leere Felder** ist (kein hängendes/führendes Komma). Öffentlich, weil auch
+  `app.py` sie nutzt (siehe Reload unten).
+- Eingesetzt an allen **vier** `displayName`-Konstruktionsstellen:
+  - Modus-5-CSV-Parser (`parse_csv`), `display_first = rufname or vorname`
+  - beide manuellen-Hinzufügen-Pfade (`build_manual_student`, klasse5 + klasse8)
+  - Modus-8-CSV-Parser (`parse_csv_klasse8`)
 
 Die **Zuweisungslogik bleibt unberührt**: Der Algorithmus rechnet mit `name`/`vorname`/Wünschen,
 nicht mit `displayName`. Klasseneinteilungen ändern sich nicht.
+
+### Backend `app.py` (gespeicherte Stände / Reload)
+
+Exportierte `klassen-stand-*.json` enthalten `displayName` bereits (im alten Format), und
+`load_state` übernahm das 1:1: ein geladener Stand hätte nach dem Update weiter „Vorname Nachname"
+gezeigt. Fix: nach dem Setzen von `_state["students"]` wird `displayName` je Schüler aus `name` +
+(`rufname` oder `vorname`) per `display_name()` neu abgeleitet (einheitlich für beide Modi; bei
+klasse8 ist `rufname` leer → fällt auf `vorname`). So bekommt auch jeder bereits exportierte Stand
+sofort das neue Format. Verifiziert mit einer echten 116-Schüler-Datei: nach `/api/load-state`
+116/116 im neuen Format.
 
 ### Frontend `static/style.css`
 
@@ -55,7 +66,7 @@ nicht mit `displayName`. Klasseneinteilungen ändern sich nicht.
   Die reine Anzeige-Umstellung darf ihn also gar nicht verändern. Grün = Beweis, dass die Zuweisung
   unberührt ist. (Ursprünglich war hier `--update` geplant, das ist nicht nötig und wäre irreführend.)
 - `tests/test_add_student.py` nachziehen, falls es `displayName` asserted.
-- Kleiner Unit-Test für `_display_name` inkl. Edge-Cases (leerer Vorname / leerer Nachname).
+- Kleiner Unit-Test für `display_name` inkl. Edge-Cases (leerer Vorname / leerer Nachname).
 
 ## Nicht-Ziele (YAGNI)
 
