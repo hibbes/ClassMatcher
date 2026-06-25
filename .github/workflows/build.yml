@@ -27,6 +27,13 @@ jobs:
           V=$(python -c "import re; print(re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open('app.py').read()).group(1))")
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "App-Version: $V"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_V="${GITHUB_REF_NAME#v}"
+            if [ "$V" != "$TAG_V" ]; then
+              echo "::error::APP_VERSION ($V) stimmt nicht mit dem Tag ($TAG_V) ueberein. Release abgebrochen, sonst zeigt version.json auf eine nicht hochgeladene Datei."
+              exit 1
+            fi
+          fi
 
       - name: Icon erstellen (PNG → ICNS)
         run: |
@@ -105,6 +112,13 @@ jobs:
           $v = $m.Groups[1].Value
           "version=$v" >> $env:GITHUB_OUTPUT
           Write-Host "App-Version: $v"
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $tagV = $env:GITHUB_REF_NAME -replace '^v',''
+            if ($v -ne $tagV) {
+              Write-Host "::error::APP_VERSION ($v) stimmt nicht mit dem Tag ($tagV) ueberein. Release abgebrochen."
+              exit 1
+            }
+          }
 
       - name: Icon erstellen (PNG → ICO)
         run: |
@@ -185,16 +199,19 @@ jobs:
           WIN_SHA=$(sha256sum "$EXE" | cut -d' ' -f1)
           DMG=$(find artifacts -name '*.dmg' | head -1)
           if [ -n "$DMG" ]; then MAC_SHA=$(sha256sum "$DMG" | cut -d' ' -f1); else MAC_SHA=""; fi
-          cat > version.json <<EOF
-          {
-            "version": "${VERSION}",
-            "win_url": "https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.exe",
-            "mac_url": "https://www.schiller-offenburg.de/classmatcher/Schiller-Klassen-Mixer-v${VERSION}.dmg",
-            "sha256": "${WIN_SHA}",
-            "mac_sha256": "${MAC_SHA}",
-            "notes": ""
-          }
-          EOF
+          BASE="https://www.schiller-offenburg.de/classmatcher"
+          if [ -n "$DMG" ]; then
+            jq -n --arg version "$VERSION" \
+                  --arg win_url "$BASE/Schiller-Klassen-Mixer-v${VERSION}.exe" \
+                  --arg mac_url "$BASE/Schiller-Klassen-Mixer-v${VERSION}.dmg" \
+                  --arg sha256 "$WIN_SHA" --arg mac_sha256 "$MAC_SHA" \
+                  '{version:$version, win_url:$win_url, mac_url:$mac_url, sha256:$sha256, mac_sha256:$mac_sha256, notes:""}' > version.json
+          else
+            jq -n --arg version "$VERSION" \
+                  --arg win_url "$BASE/Schiller-Klassen-Mixer-v${VERSION}.exe" \
+                  --arg sha256 "$WIN_SHA" \
+                  '{version:$version, win_url:$win_url, sha256:$sha256, notes:""}' > version.json
+          fi
           cat version.json
 
       - name: Upload zur Homepage (Binaries zuerst, version.json zuletzt)
@@ -226,3 +243,19 @@ jobs:
                  "ftp://$FTP_HOST/html/classmatcher/$(basename "$f")"
           done
           echo "Publish fertig: version.json $(grep -o '\"version\"[^,]*' version.json)"
+
+      - name: Post-Publish-Smoke-Check
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          BASE="https://www.schiller-offenburg.de/classmatcher"
+          sleep 5  # kurze FTP-Sichtbarkeits-Pause
+          M=$(curl -fsS -m 20 "$BASE/version.json")
+          echo "$M"
+          LV=$(echo "$M" | python3 -c "import sys,json;print(json.load(sys.stdin)['version'])")
+          if [ "$LV" != "$VERSION" ]; then echo "::error::Live version.json=$LV, erwartet $VERSION"; exit 1; fi
+          WU=$(echo "$M" | python3 -c "import sys,json;print(json.load(sys.stdin)['win_url'])")
+          curl -fsS -m 90 -o /dev/null "$WU" || { echo "::error::win_url nicht abrufbar: $WU"; exit 1; }
+          MU=$(echo "$M" | python3 -c "import sys,json;print(json.load(sys.stdin).get('mac_url',''))")
+          if [ -n "$MU" ]; then curl -fsS -m 90 -o /dev/null "$MU" || { echo "::error::mac_url nicht abrufbar: $MU"; exit 1; }; fi
+          echo "Smoke-Check OK: live version=$VERSION, Binaries abrufbar."
