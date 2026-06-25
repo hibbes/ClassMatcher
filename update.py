@@ -49,7 +49,7 @@ _CONFIG_PATH = Path.home() / ".classmatcher.cfg"
 # hartkodiert, das es auf Windows (der Zielplattform fuer Auto-Update) nicht
 # gibt, weshalb dort nie ein Log entstand und die Schul-PC-Fehler blind blieben.
 _LOG_PATH = Path(tempfile.gettempdir()) / "classmatcher-update.log"
-_TIMEOUT = 4            # Sekunden, Manifest-Check
+_TIMEOUT = 12           # Sekunden, Manifest-Check (grosszuegig fuer langsame/Proxy-Schulnetze; Download nutzt _DOWNLOAD_TIMEOUT)
 _DOWNLOAD_TIMEOUT = 60  # Sekunden Socket-Idle-Timeout beim Binary-Download
 
 
@@ -161,9 +161,12 @@ def check_for_update(current_version: str, *,
         result["download_url"] = url
         # Optionaler Integritaets-Hash aus dem Manifest (gegen den die
         # heruntergeladene Datei vor dem EXE-Tausch geprueft wird).
-        sha = manifest.get("sha256" if platform.system() != "Darwin" else "mac_sha256")
-        if sha is None:
-            sha = manifest.get("sha256")
+        # Plattform-korrekten Hash waehlen, KEIN Fallback auf den jeweils
+        # anderen: der Windows-sha256 ist nie ein gueltiger DMG-Hash (und
+        # umgekehrt). Fehlt der passende Hash, bleibt sha256=None und
+        # download_update warnt + uebernimmt ohne Integritaetspruefung.
+        sha_key = "mac_sha256" if platform.system() == "Darwin" else "sha256"
+        sha = manifest.get(sha_key)
         result["sha256"] = str(sha) if sha else None
     # Erfolgs-Heartbeat: macht auf Schul-PCs sichtbar, dass ueberhaupt geprueft
     # wurde und welche Versionen verglichen wurden (current vs latest).
@@ -258,20 +261,36 @@ def install_windows(new_exe_path) -> bool:
     new_path = Path(new_exe_path)
     if not new_path.is_file() or new_path.suffix.lower() != ".exe":
         return False
+    current = Path(sys.executable).resolve()
+    old = current.with_suffix(".exe.old")
+    # Restliche .old-Reste aus früherem Update aufräumen (best-effort).
     try:
-        current = Path(sys.executable).resolve()
-        old = current.with_suffix(".exe.old")
-        # Restliche .old-Reste aus früherem Update aufräumen (best-effort).
-        try:
-            old.unlink(missing_ok=True)
-        except OSError:
-            pass
+        old.unlink(missing_ok=True)
+    except OSError:
+        pass
+    renamed = False
+    try:
         # Windows lässt das Umbenennen der eigenen laufenden EXE zu.
         current.rename(old)
+        renamed = True
         # Neue EXE an exakt den Pfad legen, an dem die alte war.
         shutil.move(str(new_path), str(current))
         return True
     except Exception:
+        # Rollback: die alte EXE war schon weggebenannt, der move der neuen
+        # scheiterte aber (AV-Lock, abgebrochener Cross-Volume-Copy). Einen
+        # eventuellen Teil-Rest entfernen und die alte zurueckholen, sonst
+        # bliebe KEINE startbare EXE am Pfad zurueck (App nicht mehr startbar).
+        if renamed:
+            try:
+                if current.exists():
+                    current.unlink()
+            except Exception:
+                pass
+            try:
+                old.rename(current)
+            except Exception:
+                pass
         return False
 
 

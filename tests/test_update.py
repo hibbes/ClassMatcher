@@ -264,6 +264,119 @@ def test_check_for_update_logs_success_heartbeat():
         assert "1.6.0" in text and "1.5.5" in text
 
 
+@case
+def test_check_for_update_mac_uses_no_windows_sha_fallback():
+    orig = update.platform.system
+    update.platform.system = lambda: "Darwin"
+    try:
+        res = update.check_for_update("1.0.0", _config=lambda: {},
+            _fetcher=lambda c: {"version": "9.9.9",
+                "win_url": "https://www.schiller-offenburg.de/c/win.exe",
+                "mac_url": "https://www.schiller-offenburg.de/c/mac.dmg",
+                "sha256": "deadbeefwindowshash"})
+    finally:
+        update.platform.system = orig
+    assert res["update_available"] is True
+    assert res["sha256"] is None  # darf NICHT den Windows-sha256 erben
+
+
+@case
+def test_install_windows_swaps_in_place_and_keeps_backup():
+    import tempfile
+    from pathlib import Path
+    o_sys = update.platform.system
+    o_exe = update.sys.executable
+    o_frozen = getattr(update.sys, "frozen", None)
+    with tempfile.TemporaryDirectory() as td:
+        cur = Path(td) / "App.exe"; cur.write_bytes(b"OLD")
+        new = Path(td) / "dl" / "App-new.exe"; new.parent.mkdir(); new.write_bytes(b"NEW")
+        update.platform.system = lambda: "Windows"
+        update.sys.frozen = True
+        update.sys.executable = str(cur)
+        try:
+            ok = update.install_windows(new)
+        finally:
+            update.platform.system = o_sys
+            update.sys.executable = o_exe
+            if o_frozen is None:
+                try: del update.sys.frozen
+                except Exception: pass
+            else:
+                update.sys.frozen = o_frozen
+        assert ok is True
+        assert cur.read_bytes() == b"NEW"
+        assert (Path(td) / "App.exe.old").read_bytes() == b"OLD"
+
+
+@case
+def test_install_windows_rolls_back_on_move_failure():
+    import tempfile
+    from pathlib import Path
+    o_sys = update.platform.system
+    o_exe = update.sys.executable
+    o_frozen = getattr(update.sys, "frozen", None)
+    o_move = update.shutil.move
+    with tempfile.TemporaryDirectory() as td:
+        cur = Path(td) / "App.exe"; cur.write_bytes(b"OLD")
+        new = Path(td) / "dl" / "App-new.exe"; new.parent.mkdir(); new.write_bytes(b"NEW")
+        update.platform.system = lambda: "Windows"
+        update.sys.frozen = True
+        update.sys.executable = str(cur)
+        def boom(*a, **k): raise OSError("AV lock")
+        update.shutil.move = boom
+        try:
+            ok = update.install_windows(new)
+        finally:
+            update.platform.system = o_sys
+            update.sys.executable = o_exe
+            update.shutil.move = o_move
+            if o_frozen is None:
+                try: del update.sys.frozen
+                except Exception: pass
+            else:
+                update.sys.frozen = o_frozen
+        assert ok is False
+        assert cur.exists(), "App-EXE muss nach Rollback noch da sein (kein Bricking)"
+        assert cur.read_bytes() == b"OLD"
+
+
+@case
+def test_download_update_rejects_on_sha_mismatch_and_cleans_part():
+    class Op:
+        def open(self, u, timeout=None): return io.BytesIO(b"TAMPERED-BYTES")
+    with tempfile.TemporaryDirectory() as td:
+        res = update.download_update("https://x/win.exe",
+            expected_sha256="deadbeef", _config=lambda: {},
+            _opener_factory=lambda c: Op(), _target_dir=td)
+        leftover = sorted(p.name for p in Path(td).iterdir())
+    assert res["ok"] is False
+    assert "fallback_url" in res
+    assert leftover == [], f"kein .part-Rest erwartet, fand: {leftover}"
+
+
+@case
+def test_url_is_allowed_rules():
+    assert update.url_is_allowed("https://www.schiller-offenburg.de/classmatcher/x.exe") is True
+    assert update.url_is_allowed("http://www.schiller-offenburg.de/classmatcher/x.exe") is False   # HTTP-Downgrade
+    assert update.url_is_allowed("https://evil.example.com/x.exe") is False                         # fremder Host
+    assert update.url_is_allowed("not-a-url") is False
+    assert update.url_is_allowed(None) is False
+
+
+@case
+def test_download_update_strips_path_traversal_to_basename():
+    class Op:
+        def open(self, u, timeout=None): return io.BytesIO(b"X")
+    with tempfile.TemporaryDirectory() as td:
+        res = update.download_update("https://x/a/b/../../../../etc/evilname",
+            _config=lambda: {}, _opener_factory=lambda c: Op(), _target_dir=td)
+        files = sorted(p.name for p in Path(td).iterdir())
+    assert res["ok"] is True
+    # Datei landet als reiner Basename im Zielordner, kein Ausbruch:
+    assert files == ["evilname"], files
+    assert Path(res["path"]).parent == Path(td)
+
+
 def main() -> int:
     failed = 0
     for fn in CASES:
